@@ -1,24 +1,21 @@
 import os
-
-
 import requests
 import webbrowser
 import time
 import csv
 import pandas as pd
 import json
-import numpy as np
 from requests import ReadTimeout
 from datetime import datetime
-from prompt_toolkit.styles import Style
 from requests_oauthlib import OAuth2Session
 from dotenv import load_dotenv
 from file_cleanup import rename_move_and_archive_csv
 
+# load environment
 load_dotenv()
 os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
 
-
+# set variables for ESI request
 CLIENT_ID = os.getenv('CLIENT_ID')
 SECRET_KEY = os.getenv('SECRET_KEY')
 REDIRECT_URI = 'http://localhost:8000/callback'
@@ -26,28 +23,32 @@ AUTHORIZATION_URL = 'https://login.eveonline.com/v2/oauth/authorize'
 TOKEN_URL = 'https://login.eveonline.com/v2/oauth/token'
 MARKET_STRUCTURE_URL = 'https://esi.evetech.net/latest/markets/structures/1035466617946/?page='
 SCOPE = ['esi-markets.structure_markets.v1']
-TOKEN_FILE = 'token.json'
+token_file = 'token.json'
 
 
 def save_token(token):
     # Save the OAuth token including refresh token to a file.
-    with open(TOKEN_FILE, 'w') as f:
+    with open(token_file, 'w') as f:
         json.dump(token, f)
+
 
 def load_token():
     # Load the OAuth token from a file, if it exists.
-    if os.path.exists(TOKEN_FILE):
-        with open(TOKEN_FILE, 'r') as f:
+    if os.path.exists(token_file):
+        with open(token_file, 'r') as f:
             return json.load(f)
     return None
+
 
 def get_oauth_session(token=None):
     # Get an OAuth session, refreshing the token if necessary.
     extra = {'client_id': CLIENT_ID, 'client_secret': SECRET_KEY}
     if token:
-        return OAuth2Session(CLIENT_ID, token=token, auto_refresh_url=TOKEN_URL, auto_refresh_kwargs=extra, token_updater=save_token)
+        return OAuth2Session(CLIENT_ID, token=token, auto_refresh_url=TOKEN_URL, auto_refresh_kwargs=extra,
+                             token_updater=save_token)
     else:
         return OAuth2Session(CLIENT_ID, redirect_uri=REDIRECT_URI, scope=SCOPE)
+
 
 # Step 1: Redirect user to the EVE Online login page to get the authorization code
 def get_authorization_code():
@@ -60,6 +61,7 @@ def get_authorization_code():
     token = oauth.fetch_token(TOKEN_URL, authorization_response=redirect_response, client_secret=SECRET_KEY)
     save_token(token)
     return token
+
 
 def get_token():
     # Retrieve a token, refreshing it using the refresh token if available.
@@ -75,9 +77,9 @@ def get_token():
     else:
         return get_authorization_code()
 
+
 # Step 3: Fetch market orders from the structure, handling pagination
 def fetch_market_orders(test_mode):
-
     token = get_token()
 
     headers = {
@@ -117,7 +119,8 @@ def fetch_market_orders(test_mode):
 
         if response.status_code != 200:
             error_code = response.status_code
-            print(f"Error fetching data from page {page}. status code: {error_code}. tries: {tries} Retrying in 3 seconds...")
+            print(
+                f"Error fetching data from page {page}. status code: {error_code}. tries: {tries} Retrying in 3 seconds...")
             print(os.strerror(error_code))
 
             error_count += 1
@@ -163,6 +166,7 @@ def fetch_market_orders(test_mode):
 
     return all_orders, errorlog
 
+
 # Step 4: Save the market orders into a CSV file
 def save_to_csv(orders):
     filename = f"output/4Hmarketorders_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.csv"
@@ -185,6 +189,7 @@ def save_to_csv(orders):
 
     print(f"Market orders saved to {filename}")
 
+
 # Step 4a: Save the error log into a CSV file
 def save_error_log_to_csv(errorlog):
     filename = f"output/4Hmarketorders_errorlog_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.csv"
@@ -203,19 +208,20 @@ def save_error_log_to_csv(errorlog):
 
     print(f"Error log saved to {filename}")
 
-#Get the type ids to use for market history
-def get_type_ids(datafile):
 
+# Get the type ids to use for market history
+def get_type_ids(datafile):
     watchlist = pd.read_csv(datafile,
                             usecols=[0],
-                            names=['type_id'],skiprows=1
+                            names=['type_id'], skiprows=1
                             )
     type_ids = watchlist['type_id'].tolist()
     return type_ids
 
-#update market history
+
+# update market history
 def fetch_market_history(type_id_list):
-    TIMEOUT = 10
+    timeout = 10
     market_history_url = 'https://esi.evetech.net/latest/markets/10000003/history/?datasource=tranquility&type_id='
 
     headers = {
@@ -230,13 +236,13 @@ def fetch_market_history(type_id_list):
 
     print("Updating market history...")
 
-    #Iterate over type_ids to fetch market history for 4-HWWF
+    # Iterate over type_ids to fetch market history for 4-HWWF
     for type_id in range(len(type_id_list)):
         while page <= max_pages:
             item = type_id_list[type_id]
 
             try:
-                response = requests.get(market_history_url + str(item), headers=headers, timeout=TIMEOUT)
+                response = requests.get(market_history_url + str(item), headers=headers, timeout=timeout)
                 print(f"Fetching type_id: {item}, status code: {response.status_code}")  # Add this line to track status
             except ReadTimeout:
                 print(f"Request timed out for page {page}, item {item}. Retrying...")
@@ -278,7 +284,8 @@ def fetch_market_history(type_id_list):
             successful_returns += 1
             max_pages = 1
 
-        print(f'Type id {item} retrieved successfully. So far, {successful_returns} items retrieved successfully. With {errorcount} errors.')
+        print(
+            f'Type id {item} retrieved successfully. So far, {successful_returns} items retrieved successfully. With {errorcount} errors.')
         print('-------------------------')
 
         page = 1
@@ -289,7 +296,8 @@ def fetch_market_history(type_id_list):
 
     return all_history
 
-#process the market orders
+
+# process the market orders
 
 def filterorders(ids, list_orders):
     filtered_orders = list_orders[list_orders['type_id'].isin(ids)]
@@ -313,6 +321,7 @@ def aggregate_sell_orders(orders_data):
 
     return merged_df
 
+
 def mergehistorystats(merged_orders, history_data):
     historical_df = history_data
     historical_df['date'] = pd.to_datetime(historical_df['date'])
@@ -328,19 +337,21 @@ def mergehistorystats(merged_orders, history_data):
     return final_df
 
 
-
 # Step 5: Main function to run the script
 if __name__ == '__main__':
     # Location of data needed to process orders
     start_time = datetime.now()
     print(start_time)
 
-
-    #pull market orders logging start time and checking for test mode
+    # pull market orders logging start time and checking for test mode
     print("starting data pull...market orders")
 
-    #Configure to run in an abbreviated test mode....
-    test_mode = True #uses abbreviated ESI calls for debugging
+    # Configure to run in an abbreviated test mode....
+    test_choice = input("run in testing mode? This will use abbreviated ESI calls for quick debugging (y/n):")
+    if test_choice == 'y':
+        test_mode = True  # uses abbreviated ESI calls for debugging
+    else:
+        test_mode = False
 
     market_orders, errorlog = fetch_market_orders(test_mode)
 
@@ -352,8 +363,8 @@ if __name__ == '__main__':
     Mkt_time_to_complete = datetime.now() - start_time
     print(f'done. Time to complete market orders: {Mkt_time_to_complete}')
 
-    #variables for live or test mode
-    testidslocation = 'data/type_ids2.csv.' #abbreviated set of ids for debugging
+    # variables for live or test mode
+    testidslocation = 'data/type_ids2.csv.'  # abbreviated set of ids for debugging
     liveidslocation = 'data/type_ids.csv.'
 
     if test_mode:
@@ -361,16 +372,16 @@ if __name__ == '__main__':
     else:
         idslocation = liveidslocation
 
-    #code for retrieving type ids
+    # code for retrieving type ids
     type_idsCSV = pd.read_csv(idslocation)
     type_ids = type_idsCSV['type_ids'].tolist()
     order_list = {}
     filtered_orders = {}
 
-    #code for retrieving live market orders
+    # code for retrieving live market orders
     orders = pd.DataFrame(market_orders)
 
-    #update history data
+    # update history data
     print("updating history data")
     print(datetime.now())
     history_start = datetime.now()
@@ -381,7 +392,6 @@ if __name__ == '__main__':
 
     hist_time_to_complete = datetime.now() - history_start
     print(f"history data saved. Time to complete: {hist_time_to_complete}")
-
 
     new_filtered_orders = filterorders(type_ids, orders)
     merged_sell_orders = aggregate_sell_orders(new_filtered_orders)
@@ -395,7 +405,7 @@ if __name__ == '__main__':
     print(f'data processed and writing to file: {output_data_location}')
 
     finish_time = datetime.now()
-    total_time = finish_time -start_time
+    total_time = finish_time - start_time
 
     print("===================================================")
     print("ESI Request Completed Successfully.")
@@ -404,15 +414,14 @@ if __name__ == '__main__':
     print(f"Time to complete:\nMARKET ORDERS: {Mkt_time_to_complete}\nMARKET_HISTORY: {hist_time_to_complete}")
     print(f"TOTAL TIME TO COMPLETE: {total_time}")
 
-    #now we optionally update the source file for our spreadsheet in the latest folder
+    # now we optionally update the source file for our spreadsheet in the latest folder
     # and clean up other files by moving them all to the archive folder
 
     print("-----------cleaning up files and exiting----------------")
 
-    src_folder = r"/output"
+    src_folder = r"output"
     latest_folder = os.path.join(src_folder, "latest")
     archive_folder = os.path.join(src_folder, "archive")
     rename_move_and_archive_csv(src_folder, latest_folder, archive_folder)
 
     print("market update complete")
-
