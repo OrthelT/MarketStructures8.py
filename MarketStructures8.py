@@ -41,8 +41,7 @@ REDIRECT_URI = 'http://localhost:8000/callback'
 AUTHORIZATION_URL = 'https://login.eveonline.com/v2/oauth/authorize'
 TOKEN_URL = 'https://login.eveonline.com/v2/oauth/token'
 MARKET_STRUCTURE_URL = f'https://esi.evetech.net/latest/markets/structures/{structure_id}/?page='
-# MARKET_STRUCTURE_URL = 'https://esi.evetech.net/latest/markets/structures/1035466617946/?page='
-SCOPE = ['esi-markets.structure_markets.v1']
+SCOPE= ['esi-markets.structure_markets.v1']
 token_file = 'token.json'
 
 #===============================================
@@ -74,7 +73,6 @@ def get_oauth_session(token=None):
 
 
 # Redirect user to the EVE Online login page to get the authorization code.
-#
 def get_authorization_code():
     # Step 1: Redirect user to the EVE Online login page to get the authorization code.
     oauth = get_oauth_session()
@@ -102,8 +100,12 @@ def get_token():
         return get_authorization_code()
 
 
-# Step 3: Fetch market orders from the structure, handling pagination
+#===============================================
+# Functions: Fetch Market Structure Orders
+#-----------------------------------------------
 def fetch_market_orders(test_mode):
+
+    #initiates the oath2 flow
     token = get_token()
 
     headers = {
@@ -130,9 +132,11 @@ def fetch_market_orders(test_mode):
         elif response.status_code == 200:
             max_pages = 1
 
+        #The test mode booleon sets a limited number of pages for debugging.
         if test_mode == True:
             max_pages = 5
 
+        #make sure we don't hit the error limit and get our IP banned
         errorsleft = int(response.headers.get('X-ESI-Error-Limit-Remain', 0))
         errorreset = int(response.headers.get('X-ESI-Error-Limit-Reset', 0))
 
@@ -141,6 +145,7 @@ def fetch_market_orders(test_mode):
         elif errorsleft < 10:
             print(f'WARNING: Errors remaining: {errorsleft}. Error limit reset: {errorreset} seconds.')
 
+        #some error handling to gently keep prodding the ESI until we gat all the data
         if response.status_code != 200:
             error_code = response.status_code
             print(
@@ -149,13 +154,14 @@ def fetch_market_orders(test_mode):
 
             error_count += 1
 
+            #error logging
             if error_code not in errorlog:
                 errorlog[error_code] = []  # Initialize the list if it doesn't exist
             errorlog[error_code].append(page)
 
             if tries < 5:
                 tries += 1
-                time.sleep(3)
+                time.sleep(1)
                 continue
             else:
                 print(f'Reached the 5th try and giving up on page {page}.')
@@ -182,7 +188,7 @@ def fetch_market_orders(test_mode):
 
         print('-------------------------')
         print(f"Now fetching page {page}...")
-        time.sleep(1)
+        time.sleep(.5)
 
     print(f"Retrieval complete. Fetched {total_pages}. Total orders: {len(all_orders)}")
     print(f"Received {error_count} errors. After {total_tries} total tries.")
@@ -191,7 +197,7 @@ def fetch_market_orders(test_mode):
     return all_orders, errorlog
 
 
-# Step 4: Save the market orders into a CSV file
+# Save the CSV files
 def save_to_csv(orders):
     filename = f"output/4Hmarketorders_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.csv"
     fields = ['order_id', 'price', 'volume_remain', 'volume_total', 'is_buy_order', 'issued', 'type_id', 'range']
@@ -214,11 +220,9 @@ def save_to_csv(orders):
     print(f"Market orders saved to {filename}")
 
 
-# Step 4a: Save the error log into a CSV file
 def save_error_log_to_csv(errorlog):
     filename = f"output/Hmarketorders_errorlog_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.csv"
 
-    # Open CSV file in write mode
     with open(filename, mode='w', newline='') as file:
         writer = csv.writer(file)
 
@@ -229,9 +233,7 @@ def save_error_log_to_csv(errorlog):
         for error_code, pages in errorlog.items():
             pages_str = ', '.join(map(str, pages))  # Convert list of pages to a comma-separated string
             writer.writerow([error_code, pages_str])
-
     print(f"Error log saved to {filename}")
-
 
 # Get the type ids to use for market history
 def get_type_ids(datafile):
@@ -241,7 +243,6 @@ def get_type_ids(datafile):
                             )
     type_ids = watchlist['type_id'].tolist()
     return type_ids
-
 
 # update market history
 def fetch_market_history(type_id_list):
@@ -321,7 +322,7 @@ def fetch_market_history(type_id_list):
     return all_history
 
 
-# process the market orders
+# process the market orders to create the market stats
 
 def filterorders(ids, list_orders):
     filtered_orders = list_orders[list_orders['type_id'].isin(ids)]
@@ -361,9 +362,11 @@ def mergehistorystats(merged_orders, history_data):
     return final_df
 
 
-# Step 5: Main function to run the script
+#Main function where everything gets executed.
+
 if __name__ == '__main__':
-    # Location of data needed to process orders
+
+    # hit the stopwatch to see how long it takes
     start_time = datetime.now()
     print(start_time)
 
@@ -411,6 +414,7 @@ if __name__ == '__main__':
     history_start = datetime.now()
     historical_df = pd.DataFrame(fetch_market_history(type_ids))
 
+    #You can change these file names to be more accurate when pulling data for other regions.
     history_filename = f"output/valemarkethistory_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.csv"
     historical_df.to_csv(history_filename, index=False)
 
@@ -438,9 +442,7 @@ if __name__ == '__main__':
     print(f"Time to complete:\nMARKET ORDERS: {Mkt_time_to_complete}\nMARKET_HISTORY: {hist_time_to_complete}")
     print(f"TOTAL TIME TO COMPLETE: {total_time}")
 
-    # now we optionally update the source file for our spreadsheet in the latest folder
-    # and clean up other files by moving them all to the archive folder
-
+    # Optional code to tidy output up into the right folders. you can delete it if you're a slob.
     print("-----------cleaning up files and exiting----------------")
 
     src_folder = r"output"
