@@ -11,9 +11,28 @@ from requests_oauthlib import OAuth2Session
 from dotenv import load_dotenv
 from file_cleanup import rename_move_and_archive_csv
 
-# load environment
+# LICENSE
+# This program is free software: you can redistribute it and/or modify it under the terms of the
+# GNU General Public License as published by the Free Software Foundation, either version 3 of the License,
+# or (at your option) any later version. This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+# See the GNU General Public License for more details. <https://www.gnu.org/licenses/>.
+#
+# ---------------------------------------------
+# ESI Structure Market Tools for Eve Online
+# ---------------------------------------------
+# #Developed as a learning project, to access Eve's enfeebled ESI. I'm not a real programmer, ok? Don't laugh at me.
+# Contact orthel_toralen on Discord with questions.
+
+# load environment, where we store our client id and secret key.
 load_dotenv()
+
+# This flags Eve SSO to let us use a standard HTTP:// connection to do our Eve login.
+# Eve's SSO wants a https:// connection. But, who has time for setting that up. We're just going to use localhost:8000
+# Probably not ideal to transmit credentials across plain HTTP, so use your own judgement.
 os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
+
+structure_id = 1035466617946
 
 # set variables for ESI request
 CLIENT_ID = os.getenv('CLIENT_ID')
@@ -21,10 +40,14 @@ SECRET_KEY = os.getenv('SECRET_KEY')
 REDIRECT_URI = 'http://localhost:8000/callback'
 AUTHORIZATION_URL = 'https://login.eveonline.com/v2/oauth/authorize'
 TOKEN_URL = 'https://login.eveonline.com/v2/oauth/token'
-MARKET_STRUCTURE_URL = 'https://esi.evetech.net/latest/markets/structures/1035466617946/?page='
+MARKET_STRUCTURE_URL = f'https://esi.evetech.net/latest/markets/structures/{structure_id}/?page='
+# MARKET_STRUCTURE_URL = 'https://esi.evetech.net/latest/markets/structures/1035466617946/?page='
 SCOPE = ['esi-markets.structure_markets.v1']
 token_file = 'token.json'
 
+#===============================================
+# Functions: Oauth2 Flow
+#-----------------------------------------------
 
 def save_token(token):
     # Save the OAuth token including refresh token to a file.
@@ -50,7 +73,8 @@ def get_oauth_session(token=None):
         return OAuth2Session(CLIENT_ID, redirect_uri=REDIRECT_URI, scope=SCOPE)
 
 
-# Step 1: Redirect user to the EVE Online login page to get the authorization code
+# Redirect user to the EVE Online login page to get the authorization code.
+#
 def get_authorization_code():
     # Step 1: Redirect user to the EVE Online login page to get the authorization code.
     oauth = get_oauth_session()
@@ -192,7 +216,7 @@ def save_to_csv(orders):
 
 # Step 4a: Save the error log into a CSV file
 def save_error_log_to_csv(errorlog):
-    filename = f"output/4Hmarketorders_errorlog_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.csv"
+    filename = f"output/Hmarketorders_errorlog_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.csv"
 
     # Open CSV file in write mode
     with open(filename, mode='w', newline='') as file:
@@ -292,7 +316,7 @@ def fetch_market_history(type_id_list):
         max_pages = 1
         print(datetime.now())
 
-        time.sleep(.5)
+        time.sleep(.25)
 
     return all_history
 
