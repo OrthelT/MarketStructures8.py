@@ -2,7 +2,7 @@ import os
 import shutil
 
 
-def rename_move_and_archive_csv(src_folder, latest_folder, archive_folder):
+def rename_move_and_archive_csv(src_folder, latest_folder, archive_folder, full_cleanup):
     # Find all files matching the pattern 'valemarketstats_*.csv' in the source folder
     csv_files = [f for f in os.listdir(src_folder) if f.startswith("valemarketstats_") and f.endswith(".csv")]
     other_csv_files = [f for f in os.listdir(src_folder) if f.endswith(".csv")]
@@ -30,9 +30,14 @@ def rename_move_and_archive_csv(src_folder, latest_folder, archive_folder):
     print(f"File '{latest_file}' has been copied and renamed to '{new_file_name}' in the '{latest_folder}' folder.")
 
     # Move the rest of the files to the archive folder
-    for file in other_csv_files[1:]:
-        file_path = os.path.join(src_folder, file)
-        archive_file_dest = os.path.join(archive_folder, file)
-        shutil.move(file_path, archive_file_dest)
-        print(f"File '{file}' has been moved to the '{archive_folder}' folder.")
+    full_cleanup = False
 
+    if full_cleanup:
+
+        for file in other_csv_files[1:]:
+            file_path = os.path.join(src_folder, file)
+            archive_file_dest = os.path.join(archive_folder, file)
+            shutil.move(file_path, archive_file_dest)
+            print(f"File '{file}' has been moved to the '{archive_folder}' folder.")
+
+    print("files reshuffled but not archived")

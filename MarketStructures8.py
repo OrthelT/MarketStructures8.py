@@ -1,14 +1,21 @@
 import os
+import traceback
+from xml.dom.minidom import TypeInfo
+
 import requests
 import webbrowser
 import time
 import csv
 import pandas as pd
 import json
+import callnames
 from requests import ReadTimeout
 from datetime import datetime
 from requests_oauthlib import OAuth2Session
 from dotenv import load_dotenv
+import pickle
+from tornado.gen import Return
+
 from file_cleanup import rename_move_and_archive_csv
 
 # LICENSE
@@ -44,6 +51,26 @@ MARKET_STRUCTURE_URL = f'https://esi.evetech.net/latest/markets/structures/{stru
 SCOPE= ['esi-markets.structure_markets.v1']
 token_file = 'token.json'
 
+# output locations
+# You can change these file names to be more accurate when pulling data for other regions.
+orders_filename = f"output/4Hmarketorders_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.csv"
+errorlog_filename = f"output/Hmarketorders_errorlog_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.csv"
+history_filename = f"output/valemarkethistory_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.csv"
+market_stats_filename = f"output/valemarketstats_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.csv"
+
+
+def debug_mode():
+    test_choice = input("run in testing mode? This will use abbreviated ESI calls for quick debugging (y/n):")
+    if test_choice == 'y':
+        test_mode = True  # uses abbreviated ESI calls for debugging
+        csv_save_mode = input("save output to CSV? (y/n):")
+        if csv_save_mode == 'y':
+            csv_save_mode = True
+        else:
+            csv_save_mode = False
+    else:
+        test_mode = False
+    return test_mode, csv_save_mode
 #===============================================
 # Functions: Oauth2 Flow
 #-----------------------------------------------
@@ -99,7 +126,6 @@ def get_token():
     else:
         return get_authorization_code()
 
-
 #===============================================
 # Functions: Fetch Market Structure Orders
 #-----------------------------------------------
@@ -134,7 +160,7 @@ def fetch_market_orders(test_mode):
 
         #The test mode booleon sets a limited number of pages for debugging.
         if test_mode == True:
-            max_pages = 5
+            max_pages = 3
 
         #make sure we don't hit the error limit and get our IP banned
         errorsleft = int(response.headers.get('X-ESI-Error-Limit-Remain', 0))
@@ -198,9 +224,8 @@ def fetch_market_orders(test_mode):
 
 
 # Save the CSV files
-def save_to_csv(orders):
-    filename = f"output/4Hmarketorders_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.csv"
-    fields = ['order_id', 'price', 'volume_remain', 'volume_total', 'is_buy_order', 'issued', 'type_id', 'range']
+def save_to_csv(orders, filename):
+    fields = ['type_id', 'order_id', 'price', 'volume_remain', 'volume_total', 'is_buy_order', 'issued', 'range']
 
     with open(filename, mode='w', newline='') as file:
         writer = csv.DictWriter(file, fieldnames=fields)
@@ -216,12 +241,10 @@ def save_to_csv(orders):
                 'type_id': order.get('type_id'),
                 'range': order.get('range')
             })
-
     print(f"Market orders saved to {filename}")
 
 
-def save_error_log_to_csv(errorlog):
-    filename = f"output/Hmarketorders_errorlog_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.csv"
+def save_error_log_to_csv(errorlog, filename=None):
 
     with open(filename, mode='w', newline='') as file:
         writer = csv.writer(file)
@@ -234,6 +257,7 @@ def save_error_log_to_csv(errorlog):
             pages_str = ', '.join(map(str, pages))  # Convert list of pages to a comma-separated string
             writer.writerow([error_code, pages_str])
     print(f"Error log saved to {filename}")
+
 
 # Get the type ids to use for market history
 def get_type_ids(datafile):
@@ -322,8 +346,9 @@ def fetch_market_history(type_id_list):
     return all_history
 
 
-# process the market orders to create the market stats
-
+# ===============================================
+# Functions: Process Market Stats
+#-----------------------------------------------
 def filterorders(ids, list_orders):
     filtered_orders = list_orders[list_orders['type_id'].isin(ids)]
     return filtered_orders
@@ -362,7 +387,10 @@ def mergehistorystats(merged_orders, history_data):
     return final_df
 
 
-#Main function where everything gets executed.
+# ===============================================
+# MAIN PROGRAM
+# -----------------------------------------------
+# <ain function where everything gets executed.
 
 if __name__ == '__main__':
 
@@ -374,19 +402,9 @@ if __name__ == '__main__':
     print("starting data pull...market orders")
 
     # Configure to run in an abbreviated test mode....
-    test_choice = input("run in testing mode? This will use abbreviated ESI calls for quick debugging (y/n):")
-    if test_choice == 'y':
-        test_mode = True  # uses abbreviated ESI calls for debugging
-    else:
-        test_mode = False
+    test_mode, csv_save_mode = debug_mode()
 
     market_orders, errorlog = fetch_market_orders(test_mode)
-
-    # Save market orders to CSV
-    print("saving market orders")
-    save_to_csv(market_orders)
-    save_error_log_to_csv(errorlog)
-
     Mkt_time_to_complete = datetime.now() - start_time
     print(f'done. Time to complete market orders: {Mkt_time_to_complete}')
 
@@ -410,28 +428,34 @@ if __name__ == '__main__':
 
     # update history data
     print("updating history data")
-    print(datetime.now())
     history_start = datetime.now()
     historical_df = pd.DataFrame(fetch_market_history(type_ids))
-
-    #You can change these file names to be more accurate when pulling data for other regions.
-    history_filename = f"output/valemarkethistory_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.csv"
-    historical_df.to_csv(history_filename, index=False)
-
     hist_time_to_complete = datetime.now() - history_start
-    print(f"history data saved. Time to complete: {hist_time_to_complete}")
+    print(f"history data complete: {hist_time_to_complete}")
 
+    # process data
+    orders = pd.DataFrame(market_orders)
     new_filtered_orders = filterorders(type_ids, orders)
     merged_sell_orders = aggregate_sell_orders(new_filtered_orders)
     final_data = mergehistorystats(merged_sell_orders, historical_df)
 
-    filename = f"output/valemarketstats_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.csv"
+    # save files
+    if csv_save_mode:
+        print("-----------saving files and exiting----------------")
 
-    output_data_location = filename
-    final_data.to_csv(output_data_location, index=False)
+        save_to_csv(market_orders, orders_filename)
+        save_error_log_to_csv(errorlog, errorlog_filename)
+        historical_df.to_csv(history_filename, index=False)
+        final_data.to_csv(market_stats_filename, index=False)
 
-    print(f'data processed and writing to file: {output_data_location}')
+        #save a copy of market stats to update spreadsheet
 
+        src_folder = r"output"
+        latest_folder = os.path.join(src_folder, "latest")
+        archive_folder = os.path.join(src_folder, "archive")
+        rename_move_and_archive_csv(src_folder, latest_folder, archive_folder, True)
+
+    #Completed stats
     finish_time = datetime.now()
     total_time = finish_time - start_time
 
@@ -441,13 +465,4 @@ if __name__ == '__main__':
     print("=====================================================")
     print(f"Time to complete:\nMARKET ORDERS: {Mkt_time_to_complete}\nMARKET_HISTORY: {hist_time_to_complete}")
     print(f"TOTAL TIME TO COMPLETE: {total_time}")
-
-    # Optional code to tidy output up into the right folders. you can delete it if you're a slob.
-    print("-----------cleaning up files and exiting----------------")
-
-    src_folder = r"output"
-    latest_folder = os.path.join(src_folder, "latest")
-    archive_folder = os.path.join(src_folder, "archive")
-    rename_move_and_archive_csv(src_folder, latest_folder, archive_folder)
-
     print("market update complete")
