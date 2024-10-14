@@ -39,16 +39,18 @@ load_dotenv()
 # Probably not ideal to transmit credentials across plain HTTP, so use your own judgement.
 os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
 
+# Currently set for the 4-HWWF Keepstar. You can enter another structure ID for a player-owned structure that you have access to.
 structure_id = 1035466617946
 
-# set variables for ESI request
-CLIENT_ID = os.getenv('CLIENT_ID')
-SECRET_KEY = os.getenv('SECRET_KEY')
-REDIRECT_URI = 'http://localhost:8000/callback'
+# set variables for ESI requests
+CLIENT_ID = os.getenv('CLIENT_ID')  # stored in you .env file
+SECRET_KEY = os.getenv('SECRET_KEY')  # stored in you .env file
+REDIRECT_URI = 'http://localhost:8000/callback'  #workaround so we don't have to set up a real server
 AUTHORIZATION_URL = 'https://login.eveonline.com/v2/oauth/authorize'
 TOKEN_URL = 'https://login.eveonline.com/v2/oauth/token'
 MARKET_STRUCTURE_URL = f'https://esi.evetech.net/latest/markets/structures/{structure_id}/?page='
-SCOPE= ['esi-markets.structure_markets.v1']
+SCOPE = [
+    'esi-markets.structure_markets.v1']  #make sure you have this scope enabled in you ESI Dev Application settings.
 token_file = 'token.json'
 
 # output locations
@@ -70,6 +72,8 @@ def debug_mode():
             csv_save_mode = False
     else:
         test_mode = False
+        csv_save_mode = True
+
     return test_mode, csv_save_mode
 #===============================================
 # Functions: Oauth2 Flow
@@ -448,11 +452,11 @@ if __name__ == '__main__':
         historical_df.to_csv(history_filename, index=False)
         final_data.to_csv(market_stats_filename, index=False)
 
-        #save a copy of market stats to update spreadsheet
-
+        #save a copy of market stats to update spreadsheet consistently named
         src_folder = r"output"
         latest_folder = os.path.join(src_folder, "latest")
         archive_folder = os.path.join(src_folder, "archive")
+        #cleanup files. "Full cleanup true" moves old files from output to archive.
         rename_move_and_archive_csv(src_folder, latest_folder, archive_folder, True)
 
     #Completed stats

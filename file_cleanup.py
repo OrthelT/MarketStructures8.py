@@ -30,7 +30,7 @@ def rename_move_and_archive_csv(src_folder, latest_folder, archive_folder, full_
     print(f"File '{latest_file}' has been copied and renamed to '{new_file_name}' in the '{latest_folder}' folder.")
 
     # Move the rest of the files to the archive folder
-    full_cleanup = False
+    full_cleanup = full_cleanup
 
     if full_cleanup:
 
