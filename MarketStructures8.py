@@ -59,6 +59,7 @@ orders_filename = f"output/4Hmarketorders_{datetime.now().strftime('%Y-%m-%d_%H-
 errorlog_filename = f"output/Hmarketorders_errorlog_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.csv"
 history_filename = f"output/valemarkethistory_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.csv"
 market_stats_filename = f"output/valemarketstats_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.csv"
+merged_sell_filename = f"output/valemergedsell_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.csv"
 
 
 def debug_mode():
@@ -191,7 +192,7 @@ def fetch_market_orders(test_mode):
 
             if tries < 5:
                 tries += 1
-                time.sleep(1)
+                time.sleep(.5)
                 continue
             else:
                 print(f'Reached the 5th try and giving up on page {page}.')
@@ -345,7 +346,7 @@ def fetch_market_history(type_id_list):
         max_pages = 1
         print(datetime.now())
 
-        time.sleep(.25)
+        time.sleep(.1)
 
     return all_history
 
@@ -390,6 +391,36 @@ def mergehistorystats(merged_orders, history_data):
 
     return final_df
 
+
+def history_merge(history_data):
+    historical_df = history_data
+    historical_df['date'] = pd.to_datetime(historical_df['date'])
+    last_30_days_df = historical_df[historical_df['date'] >= pd.to_datetime('today') - pd.DateOffset(days=30)]
+    grouped_historical_df = last_30_days_df.groupby('type_id').agg(
+        avg_of_avg_price=('average', 'mean'),
+        avg_daily_volume=('volume', 'mean'),
+    ).reset_index()
+    grouped_historical_df['avg_of_avg_price'] = grouped_historical_df['avg_of_avg_price'].round(2)
+    grouped_historical_df['avg_daily_volume'] = grouped_historical_df['avg_daily_volume'].round(2)
+
+    return grouped_historical_df
+
+
+def missing_history(grouped_history_data, merged_data):
+    missing_history_data = []
+    for index, row in grouped_history_data.iterrows():
+        if row['type_id'] not in merged_data['type_id'].tolist():
+            missing_history_data.append(row)
+    missing_history_df = pd.DataFrame(missing_history_data)
+
+    # merge missing history data
+    final_merged_data = pd.concat([merged_data, missing_history_df])
+
+    # fix na and number formats
+    final_merged_data.fillna(0, inplace=True)
+    final_merged_data['type_id'] = final_merged_data['type_id'].astype(int)
+
+    return final_merged_data
 
 # ===============================================
 # MAIN PROGRAM
@@ -441,7 +472,15 @@ if __name__ == '__main__':
     orders = pd.DataFrame(market_orders)
     new_filtered_orders = filterorders(type_ids, orders)
     merged_sell_orders = aggregate_sell_orders(new_filtered_orders)
-    final_data = mergehistorystats(merged_sell_orders, historical_df)
+
+    # merged_history = history_merge(historical_df)
+    merged_data = mergehistorystats(merged_sell_orders, historical_df)
+
+    # now we add back in history items that we don't have current sell orders for
+    grouped_history_data = history_merge(historical_df)
+    final_data = missing_history(grouped_history_data, merged_data)
+
+
 
     # save files
     if csv_save_mode:
