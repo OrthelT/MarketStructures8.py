@@ -1,6 +1,4 @@
 import os
-import traceback
-from xml.dom.minidom import TypeInfo
 
 import requests
 import webbrowser
@@ -8,13 +6,10 @@ import time
 import csv
 import pandas as pd
 import json
-import callnames
 from requests import ReadTimeout
 from datetime import datetime
 from requests_oauthlib import OAuth2Session
 from dotenv import load_dotenv
-import pickle
-from tornado.gen import Return
 
 from file_cleanup import rename_move_and_archive_csv
 
@@ -84,6 +79,9 @@ def save_token(token):
     # Save the OAuth token including refresh token to a file.
     with open(token_file, 'w') as f:
         json.dump(token, f)
+        # note some IDEs will flag this as an error.
+        # This is because jason.dump expects a str, but got a TextIO instead.
+        # TextIO does support string writing, so this is not actually an issue.
 
 
 def load_token():
@@ -164,7 +162,7 @@ def fetch_market_orders(test_mode):
             max_pages = 1
 
         #The test mode booleon sets a limited number of pages for debugging.
-        if test_mode == True:
+        if test_mode:
             max_pages = 3
 
         #make sure we don't hit the error limit and get our IP banned
@@ -247,6 +245,9 @@ def save_to_csv(orders, filename):
                 'range': order.get('range')
             })
     print(f"Market orders saved to {filename}")
+    # note some IDEs will flag the variable 'file' as an error.
+    # This is because DictWriter expects a str, but got a TextIO instead.
+    # TextIO does support string writing, so this is not actually an issue.
 
 
 def save_error_log_to_csv(errorlog, filename=None):
@@ -287,7 +288,6 @@ def fetch_market_history(type_id_list):
     errorcount = 0
     tries = 0
     successful_returns = 0
-
     print("Updating market history...")
 
     # Iterate over type_ids to fetch market history for 4-HWWF
@@ -344,10 +344,8 @@ def fetch_market_history(type_id_list):
 
         page = 1
         max_pages = 1
-        print(datetime.now())
 
         time.sleep(.1)
-
     return all_history
 
 
@@ -378,19 +376,9 @@ def aggregate_sell_orders(orders_data):
 
 
 def mergehistorystats(merged_orders, history_data):
-    historical_df = history_data
-    historical_df['date'] = pd.to_datetime(historical_df['date'])
-    last_30_days_df = historical_df[historical_df['date'] >= pd.to_datetime('today') - pd.DateOffset(days=30)]
-    grouped_historical_df = last_30_days_df.groupby('type_id').agg(
-        avg_of_avg_price=('average', 'mean'),
-        avg_daily_volume=('volume', 'mean'),
-    ).reset_index()
-    grouped_historical_df['avg_of_avg_price'] = grouped_historical_df['avg_of_avg_price'].round(2)
-    grouped_historical_df['avg_daily_volume'] = grouped_historical_df['avg_daily_volume'].round(2)
+    grouped_historical_df = history_merge(history_data)
     final_df = pd.merge(merged_orders, grouped_historical_df, on='type_id', how='left')
-
-    return final_df
-
+    return final_df, grouped_historical_df
 
 def history_merge(history_data):
     historical_df = history_data
@@ -422,6 +410,7 @@ def missing_history(grouped_history_data, merged_data):
 
     return final_merged_data
 
+
 # ===============================================
 # MAIN PROGRAM
 # -----------------------------------------------
@@ -439,9 +428,12 @@ if __name__ == '__main__':
     # Configure to run in an abbreviated test mode....
     test_mode, csv_save_mode = debug_mode()
 
+    # code for retrieving live market orders
     market_orders, errorlog = fetch_market_orders(test_mode)
     Mkt_time_to_complete = datetime.now() - start_time
-    print(f'done. Time to complete market orders: {Mkt_time_to_complete}')
+    Avg_market_response_time = (Mkt_time_to_complete.microseconds / len(market_orders)) / 1000
+    print(
+        f'done. Time to complete market orders: {Mkt_time_to_complete}, avg market response time: {Avg_market_response_time}ms')
 
     # variables for live or test mode
     testidslocation = 'data/type_ids2.csv.'  # abbreviated set of ids for debugging
@@ -455,11 +447,7 @@ if __name__ == '__main__':
     # code for retrieving type ids
     type_idsCSV = pd.read_csv(idslocation)
     type_ids = type_idsCSV['type_ids'].tolist()
-    order_list = {}
-    filtered_orders = {}
 
-    # code for retrieving live market orders
-    orders = pd.DataFrame(market_orders)
 
     # update history data
     print("updating history data")
@@ -474,10 +462,9 @@ if __name__ == '__main__':
     merged_sell_orders = aggregate_sell_orders(new_filtered_orders)
 
     # merged_history = history_merge(historical_df)
-    merged_data = mergehistorystats(merged_sell_orders, historical_df)
+    merged_data, grouped_history_data = mergehistorystats(merged_sell_orders, historical_df)
 
     # now we add back in history items that we don't have current sell orders for
-    grouped_history_data = history_merge(historical_df)
     final_data = missing_history(grouped_history_data, merged_data)
 
 
@@ -506,6 +493,7 @@ if __name__ == '__main__':
     print("ESI Request Completed Successfully.")
     print(f"Data for {len(final_data)} items retrieved.")
     print("=====================================================")
-    print(f"Time to complete:\nMARKET ORDERS: {Mkt_time_to_complete}\nMARKET_HISTORY: {hist_time_to_complete}")
+    print(
+        f"Time to complete:\nMARKET ORDERS: {Mkt_time_to_complete}, avg: {Avg_market_response_time}\nMARKET_HISTORY: {hist_time_to_complete}")
     print(f"TOTAL TIME TO COMPLETE: {total_time}")
     print("market update complete")
