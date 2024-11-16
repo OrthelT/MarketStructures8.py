@@ -75,6 +75,7 @@ def debug_mode():
 # Functions: Oauth2 Flow
 #-----------------------------------------------
 
+# noinspection PyTypeChecker
 def save_token(token):
     # Save the OAuth token including refresh token to a file.
     with open(token_file, 'w') as f:
@@ -227,6 +228,7 @@ def fetch_market_orders(test_mode):
 
 
 # Save the CSV files
+# noinspection PyTypeChecker
 def save_to_csv(orders, filename):
     fields = ['type_id', 'order_id', 'price', 'volume_remain', 'volume_total', 'is_buy_order', 'issued', 'range']
 
@@ -275,7 +277,7 @@ def get_type_ids(datafile):
     return type_ids
 
 # update market history
-def fetch_market_history(type_id_list):
+def fetch_market_history(type_id_list: list[int]) -> list[dict[str, int | str | float]]:
     timeout = 10
     market_history_url = 'https://esi.evetech.net/latest/markets/10000003/history/?datasource=tranquility&type_id='
 
@@ -298,6 +300,38 @@ def fetch_market_history(type_id_list):
             try:
                 response = requests.get(market_history_url + str(item), headers=headers, timeout=timeout)
                 print(f"Fetching type_id: {item}, status code: {response.status_code}")  # Add this line to track status
+                page += 1
+                tries = 0
+                if 'X-Pages' in response.headers:
+                    max_pages = int(response.headers['X-Pages'])
+                else:
+                    max_pages = 1
+
+                if response.status_code != 200:
+                    print('error detected, retrying in 3 seconds...')
+                    time.sleep(3)
+                    errorcount += 1
+                    if tries < 5:
+                        tries += 1
+                        continue
+                    elif tries == 5:
+                        print(f'Unable to retrieve any data for {item}. Moving on to the next...')
+                        break
+
+                data = response.json()
+
+                if data:
+                    # Append the type_id to each item in the response
+                    for entry in data:
+                        entry['type_id'] = item  # Add type_id to each record
+
+                    all_history.extend(data)
+                else:
+                    print(f"Empty response for type_id {item}. Skipping.")
+
+                successful_returns += 1
+                max_pages = 1
+
             except ReadTimeout:
                 print(f"Request timed out for page {page}, item {item}. Retrying...")
                 if tries < 5:
@@ -305,47 +339,13 @@ def fetch_market_history(type_id_list):
                     time.sleep(3)  # Wait before retrying
                     continue
 
-            page += 1
-            tries = 0
-
-            if 'X-Pages' in response.headers:
-                max_pages = int(response.headers['X-Pages'])
-            else:
-                max_pages = 1
-
-            if response.status_code != 200:
-                print('error detected, retrying in 3 seconds...')
-                time.sleep(3)
-                errorcount += 1
-                if tries < 5:
-                    tries += 1
-                    continue
-                elif tries == 5:
-                    print(f'Unable to retrieve any data for {item}. Moving on to the next...')
-                    break
-
-            data = response.json()
-
-            if data:
-                # Append the type_id to each item in the response
-                for entry in data:
-                    entry['type_id'] = item  # Add type_id to each record
-
-                all_history.extend(data)
-            else:
-                print(f"Empty response for type_id {item}. Skipping.")
-
-            successful_returns += 1
-            max_pages = 1
-
-        print(
-            f'Type id {item} retrieved successfully. So far, {successful_returns} items retrieved successfully. With {errorcount} errors.')
-        print('-------------------------')
+            print(
+                f'Type id {item} retrieved successfully. So far, {successful_returns} items retrieved successfully. With {errorcount} errors.')
+            print('-------------------------')
 
         page = 1
         max_pages = 1
 
-        time.sleep(.1)
     return all_history
 
 
