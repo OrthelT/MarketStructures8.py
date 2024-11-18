@@ -10,7 +10,6 @@ from datetime import datetime
 from ESI_OAUTH_FLOW import get_token
 from file_cleanup import rename_move_and_archive_csv
 
-
 # LICENSE
 # This program is free software: you can redistribute it and/or modify it under the terms of the
 # GNU General Public License as published by the Free Software Foundation, either version 3 of the License,
@@ -42,6 +41,7 @@ errorlog_filename = f"output/Hmarketorders_errorlog_{datetime.now().strftime('%Y
 history_filename = f"output/valemarkethistory_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.csv"
 market_stats_filename = f"output/valemarketstats_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.csv"
 merged_sell_filename = f"output/valemergedsell_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.csv"
+master_history_filename = "data/masterhistory/valemarkethistory_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.csv"
 
 
 def configuration_mode():
@@ -50,7 +50,7 @@ def configuration_mode():
         test_mode, csv_save_mode = debug_mode()
         return test_mode, csv_save_mode
     else:
-        return False, False
+        return False, True
 
 def debug_mode():
     test_choice = input("run in testing mode? This will use abbreviated ESI calls for quick debugging (y/n):")
@@ -161,6 +161,7 @@ def fetch_market_orders(test_mode):
     print(f"Retrieval complete. Fetched {total_pages}. Total orders: {len(all_orders)}")
     print(f"Received {error_count} errors.")
     print(f"{total_tries} total tries.")
+
     save_errors = input("save error log? y/n")
     if save_errors == 'y':
         print("saving error log to csv...")
@@ -417,10 +418,13 @@ def aggregate_sell_orders(orders_data):
     return merged_df
 
 
-def mergehistorystats(merged_orders, history_data):
+def merge_market_stats(merged_orders, history_data):
     grouped_historical_df = history_merge(history_data)
-    final_df = pd.merge(merged_orders, grouped_historical_df, on='type_id', how='left')
-    return final_df, grouped_historical_df
+    merged_data = pd.merge(merged_orders, grouped_historical_df, on='type_id', how='left')
+    print(merged_data.head())
+    final_df = pd.merge(merged_data, watchlist, on='type_id', how='left')
+    print(final_df)
+    return final_df
 
 def history_merge(history_data):
     historical_df = history_data
@@ -434,25 +438,6 @@ def history_merge(history_data):
     grouped_historical_df['avg_daily_volume'] = grouped_historical_df['avg_daily_volume'].round(2)
 
     return grouped_historical_df
-
-
-def missing_history(grouped_history_data, merged_data):
-    missing_history_data = []
-    for index, row in grouped_history_data.iterrows():
-        if row['type_id'] not in merged_data['type_id'].tolist():
-            missing_history_data.append(row)
-    missing_history_df = pd.DataFrame(missing_history_data)
-
-    # merge missing history data
-    final_merged_data = pd.concat([merged_data, missing_history_df])
-
-    # fix na and number formats
-    final_merged_data.fillna(0, inplace=True)
-    final_merged_data['type_id'] = final_merged_data['type_id'].astype(int)
-
-    return final_merged_data
-
-
 
 # ===============================================
 # MAIN PROGRAM
@@ -473,13 +458,9 @@ if __name__ == '__main__':
 
     if test_mode:
         idslocation = 'data/type_ids2.csv.'
-    else:
-        idslocation = 'data/type_ids.csv.'
-
-    # code for retrieving live market orders
-    if test_mode:
         market_orders = fetch_market_orders(test_mode)
     else:
+        idslocation = 'data/type_ids.csv.'
         market_orders = fetch_market_orders_standard()
 
 
@@ -488,11 +469,11 @@ if __name__ == '__main__':
     print(
         f'done. Time to complete market orders: {Mkt_time_to_complete}, avg market response time: {Avg_market_response_time}ms')
 
-
-
     # code for retrieving type ids
     type_idsCSV = pd.read_csv(idslocation)
     type_ids = type_idsCSV['type_ids'].tolist()
+    expanded_type_ids = 'data/inv_types_expanded.csv'
+    watchlist = pd.read_csv('data/watchlist.csv')
 
 
     # update history data
@@ -506,18 +487,18 @@ if __name__ == '__main__':
     orders = pd.DataFrame(market_orders)
     new_filtered_orders = filterorders(type_ids, orders)
     merged_sell_orders = aggregate_sell_orders(new_filtered_orders)
+    merge_market_stats(merged_sell_orders, historical_df)
 
-    # merged_history = history_merge(historical_df)
-    merged_data, grouped_history_data = mergehistorystats(merged_sell_orders, historical_df)
-
-    # now we add back in history items that we don't have current sell orders for
-    final_data = missing_history(grouped_history_data, merged_data)
+    final_data = merge_market_stats(merged_sell_orders, historical_df)
 
     # save files
     if csv_save_mode:
         print("-----------saving files and exiting----------------")
 
         save_to_csv(market_orders, orders_filename)
+        # reorder history columns
+        new_columns = ['date', 'type_id', 'highest', 'lowest', 'average', 'order_count', 'volume']
+        historical_df = historical_df[new_columns]
         historical_df.to_csv(history_filename, index=False)
         final_data.to_csv(market_stats_filename, index=False)
 
@@ -528,7 +509,7 @@ if __name__ == '__main__':
         #cleanup files. "Full cleanup true" moves old files from output to archive.
         rename_move_and_archive_csv(src_folder, latest_folder, archive_folder, True)
 
-    #Completed stats
+    # Completed stats
     finish_time = datetime.now()
     total_time = finish_time - start_time
 
