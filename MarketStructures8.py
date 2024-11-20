@@ -9,6 +9,7 @@ from datetime import datetime
 
 from ESI_OAUTH_FLOW import get_token
 from file_cleanup import rename_move_and_archive_csv
+from get_jita_prices import get_jita_prices
 
 # LICENSE
 # This program is free software: you can redistribute it and/or modify it under the terms of the
@@ -490,6 +491,7 @@ if __name__ == '__main__':
     merge_market_stats(merged_sell_orders, historical_df)
 
     final_data = merge_market_stats(merged_sell_orders, historical_df)
+    vale_jita = get_jita_prices(final_data)
 
     # save files
     if csv_save_mode:
@@ -509,6 +511,8 @@ if __name__ == '__main__':
         #cleanup files. "Full cleanup true" moves old files from output to archive.
         rename_move_and_archive_csv(src_folder, latest_folder, archive_folder, True)
 
+        print("saving vale_jita data")
+        vale_jita.to_csv('output/latest/vale_jita.csv', index=False)
     # Completed stats
     finish_time = datetime.now()
     total_time = finish_time - start_time
