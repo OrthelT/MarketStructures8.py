@@ -44,7 +44,6 @@ market_stats_filename = f"output/valemarketstats_{datetime.now().strftime('%Y-%m
 merged_sell_filename = f"output/valemergedsell_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.csv"
 master_history_filename = "data/masterhistory/valemarkethistory_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.csv"
 
-
 def configuration_mode():
     config_choice = input("run in configuration mode? (y/n):")
     if config_choice == 'y':
@@ -67,8 +66,6 @@ def debug_mode():
         csv_save_mode = True
 
     return test_mode, csv_save_mode
-
-
 #
 
 #===============================================
@@ -475,7 +472,6 @@ if __name__ == '__main__':
     type_ids = type_idsCSV['type_ids'].tolist()
     expanded_type_ids = 'data/inv_types_expanded.csv'
     watchlist = pd.read_csv('data/watchlist.csv')
-
 
     # update history data
     print("updating history data")

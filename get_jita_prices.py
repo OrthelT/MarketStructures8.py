@@ -5,7 +5,6 @@ import json
 # Tools to retrieve Jita prices using the Fuzzworks market API
 # Sample data to use for testing
 
-
 def get_jita_prices(vale_data):
     regionid = '10000002'
     base_url = 'https://market.fuzzwork.co.uk/aggregates/?region='
@@ -18,12 +17,10 @@ def get_jita_prices(vale_data):
     merged_df = merge_vale_data(jita_data, vale_data)
     return merged_df
 
-
 def get_vale_type_ids(vale_data):
     ids = vale_data['type_id'].to_list()
     ids_str = ','.join(map(str, ids))
     return ids_str
-
 
 def merge_vale_data(jita_data, vale_data):
     vale_df = vale_data.copy()
@@ -37,7 +34,6 @@ def merge_vale_data(jita_data, vale_data):
                            'avg_of_avg_price', 'avg_daily_volume', 'group_id', 'jita_sell', 'jita_buy',
                            'group_name', 'category_id', 'category_name']]
     return merged_df
-
 
 def parse_json(data) -> pd.DataFrame:
     # Prepare data for DataFrame
@@ -54,11 +50,8 @@ def parse_json(data) -> pd.DataFrame:
         })
 
     df = pd.DataFrame(rows)
-    df['jita_sell'] = df['jita_sell'].round()
-    df['jita_buy'] = df['jita_buy'].round()
+    df['jita_sell'] = df['jita_sell'].round(2)
+    df['jita_buy'] = df['jita_buy'].round(2)
 
     return df
 
-
-if __name__ == '__main__':
-    json_file = 'data/jita_test.json'
