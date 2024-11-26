@@ -12,7 +12,6 @@ def get_jita_prices(vale_data):
     url = f'{base_url}{regionid}&types={ids_str}'
     response = requests.get(url)
     data = response.json()
-    print(data)
     jita_data = parse_json(data)
     merged_df = merge_vale_data(jita_data, vale_data)
     return merged_df
@@ -26,7 +25,6 @@ def merge_vale_data(jita_data, vale_data):
     vale_df = vale_data.copy()
     vale_df['type_id'] = vale_df['type_id'].astype(int)
     jita_data.columns = ['type_id', 'jita_sell', 'jita_buy']
-    print(jita_data.head())
     jita_data['type_id'] = jita_data['type_id'].astype(int)
     merged_df = pd.merge(vale_df, jita_data, on='type_id', how='left')
     merged_df = merged_df.reset_index(drop=True)
