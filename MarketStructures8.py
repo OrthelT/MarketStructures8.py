@@ -419,9 +419,7 @@ def aggregate_sell_orders(orders_data):
 def merge_market_stats(merged_orders, history_data):
     grouped_historical_df = history_merge(history_data)
     merged_data = pd.merge(merged_orders, grouped_historical_df, on='type_id', how='left')
-    print(merged_data.head())
     final_df = pd.merge(merged_data, watchlist, on='type_id', how='left')
-    print(final_df)
     return final_df
 
 def history_merge(history_data):
