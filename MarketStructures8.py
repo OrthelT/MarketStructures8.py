@@ -32,6 +32,7 @@ structure_id = 1035466617946
 
 # set variables for ESI requests
 MARKET_STRUCTURE_URL = f'https://esi.evetech.net/latest/markets/structures/{structure_id}/?page='
+print(MARKET_STRUCTURE_URL)
 SCOPE = [
     'esi-markets.structure_markets.v1']  #make sure you have this scope enabled in you ESI Dev Application settings.
 
