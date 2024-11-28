@@ -1,0 +1,504 @@
+type_id,group_id,type_name,group_name,category_id,category_name
+34,18,Tritanium,Mineral,4,Material
+36,18,Mexallon,Mineral,4,Material
+37,18,Isogen,Mineral,4,Material
+38,18,Nocxium,Mineral,4,Material
+39,18,Zydrine,Mineral,4,Material
+40,18,Megacyte,Mineral,4,Material
+44,1034,Enriched Uranium,Refined Commodities - Tier 2,43,Planetary Commodities
+448,52,Warp Scrambler II,Warp Scrambler,7,Module
+453,53,Small Focused Pulse Laser I,Energy Weapon,7,Module
+454,53,Small Focused Beam Laser I,Energy Weapon,7,Module
+499,509,Light Missile Launcher I,Missile Launcher Light,7,Module
+519,59,Gyrostabilizer II,Gyrostabilizer,7,Module
+527,65,Stasis Webifier II,Stasis Web,7,Module
+580,80,Burst Jammer I,Burst Jammer,7,Module
+582,25,Bantam,Frigate,6,Ship
+583,25,Condor,Frigate,6,Ship
+584,25,Griffin,Frigate,6,Ship
+585,25,Slasher,Frigate,6,Ship
+586,25,Probe,Frigate,6,Ship
+587,25,Rifter,Frigate,6,Ship
+590,25,Inquisitor,Frigate,6,Ship
+594,25,Incursus,Frigate,6,Ship
+598,25,Breacher,Frigate,6,Ship
+599,25,Burst,Frigate,6,Ship
+602,25,Kestrel,Frigate,6,Ship
+605,25,Heron,Frigate,6,Ship
+608,25,Atron,Frigate,6,Ship
+609,25,Maulus,Frigate,6,Ship
+620,26,Osprey,Cruiser,6,Ship
+621,26,Caracal,Cruiser,6,Ship
+622,26,Stabber,Cruiser,6,Ship
+623,26,Moa,Cruiser,6,Ship
+626,26,Vexor,Cruiser,6,Ship
+627,26,Thorax,Cruiser,6,Ship
+631,26,Scythe,Cruiser,6,Ship
+632,26,Blackbird,Cruiser,6,Ship
+633,26,Celestis,Cruiser,6,Ship
+634,26,Exequror,Cruiser,6,Ship
+638,27,Raven,Battleship,6,Ship
+640,27,Scorpion,Battleship,6,Ship
+644,27,Typhoon,Battleship,6,Ship
+1182,96,Auto Targeting System I,Automated Targeting System,7,Module
+1236,764,Overdrive Injector System II,Overdrive Injector System,7,Module
+1335,78,Reinforced Bulkheads II,Reinforced Bulkhead,7,Module
+1355,769,Reactor Control Unit II,Reactor Control Unit,7,Module
+1405,762,Inertial Stabilizers II,Inertial Stabilizer,7,Module
+1447,767,Capacitor Power Relay II,Capacitor Power Relay,7,Module
+1541,766,Power Diagnostic System II,Power Diagnostic System,7,Module
+1877,511,Rapid Light Missile Launcher II,Missile Launcher Rapid Light,7,Module
+1952,212,Sensor Booster II,Sensor Booster,7,Module
+1978,213,Tracking Computer II,Tracking Computer,7,Module
+1987,210,Signal Amplifier II,Signal Amplifier,7,Module
+1999,211,Tracking Enhancer II,Tracking Enhancer,7,Module
+2048,60,Damage Control II,Damage Control,7,Module
+2161,25,Crucifier,Frigate,6,Ship
+2175,100,Infiltrator II,Combat Drone,18,Drone
+2185,100,Hammerhead II,Combat Drone,18,Drone
+2205,100,Acolyte II,Combat Drone,18,Drone
+2281,77,Multispectrum Shield Hardener II,Shield Hardener,7,Module
+2301,77,EM Shield Hardener II,Shield Hardener,7,Module
+2312,1034,Supertensile Plastics,Refined Commodities - Tier 2,43,Planetary Commodities
+2317,1034,Oxides,Refined Commodities - Tier 2,43,Planetary Commodities
+2319,1034,Test Cultures,Refined Commodities - Tier 2,43,Planetary Commodities
+2321,1034,Polyaramids,Refined Commodities - Tier 2,43,Planetary Commodities
+2327,1034,Microfiber Shielding,Refined Commodities - Tier 2,43,Planetary Commodities
+2328,1034,Water-Cooled CPU,Refined Commodities - Tier 2,43,Planetary Commodities
+2329,1034,Biocells,Refined Commodities - Tier 2,43,Planetary Commodities
+2344,1040,Condensates,Specialized Commodities - Tier 3,43,Planetary Commodities
+2345,1040,Camera Drones,Specialized Commodities - Tier 3,43,Planetary Commodities
+2346,1040,Synthetic Synapses,Specialized Commodities - Tier 3,43,Planetary Commodities
+2348,1040,Gel-Matrix Biopaste,Specialized Commodities - Tier 3,43,Planetary Commodities
+2349,1040,Supercomputers,Specialized Commodities - Tier 3,43,Planetary Commodities
+2351,1040,Smartfab Units,Specialized Commodities - Tier 3,43,Planetary Commodities
+2352,1040,Nuclear Reactors,Specialized Commodities - Tier 3,43,Planetary Commodities
+2354,1040,Neocoms,Specialized Commodities - Tier 3,43,Planetary Commodities
+2358,1040,Biotech Research Reports,Specialized Commodities - Tier 3,43,Planetary Commodities
+2360,1040,Industrial Explosives,Specialized Commodities - Tier 3,43,Planetary Commodities
+2361,1040,Hermetic Membranes,Specialized Commodities - Tier 3,43,Planetary Commodities
+2366,1040,Hazmat Detection Systems,Specialized Commodities - Tier 3,43,Planetary Commodities
+2367,1040,Cryoprotectant Solution,Specialized Commodities - Tier 3,43,Planetary Commodities
+2389,1042,Plasmoids,Basic Commodities - Tier 1,43,Planetary Commodities
+2390,1042,Electrolytes,Basic Commodities - Tier 1,43,Planetary Commodities
+2392,1042,Oxidizing Compound,Basic Commodities - Tier 1,43,Planetary Commodities
+2393,1042,Bacteria,Basic Commodities - Tier 1,43,Planetary Commodities
+2395,1042,Proteins,Basic Commodities - Tier 1,43,Planetary Commodities
+2396,1042,Biofuels,Basic Commodities - Tier 1,43,Planetary Commodities
+2397,1042,Industrial Fibers,Basic Commodities - Tier 1,43,Planetary Commodities
+2398,1042,Reactive Metals,Basic Commodities - Tier 1,43,Planetary Commodities
+2399,1042,Precious Metals,Basic Commodities - Tier 1,43,Planetary Commodities
+2400,1042,Toxic Metals,Basic Commodities - Tier 1,43,Planetary Commodities
+2401,1042,Chiral Structures,Basic Commodities - Tier 1,43,Planetary Commodities
+2404,509,Light Missile Launcher II,Missile Launcher Light,7,Module
+2463,1034,Nanites,Refined Commodities - Tier 2,43,Planetary Commodities
+2488,100,Warrior II,Combat Drone,18,Drone
+2571,201,Gravimetric ECM II,ECM,7,Module
+2605,763,Nanofiber Internal Structure II,Nanofiber Internal Structure,7,Module
+2613,653,Mjolnir Fury Light Missile,Advanced Light Missile,8,Charge
+2647,653,Inferno Precision Light Missile,Advanced Light Missile,8,Charge
+2867,1041,Broadcast Node,Advanced Commodities - Tier 4,43,Planetary Commodities
+2868,1041,Integrity Response Drones,Advanced Commodities - Tier 4,43,Planetary Commodities
+2869,1041,Nano-Factory,Advanced Commodities - Tier 4,43,Planetary Commodities
+2870,1041,Organic Mortar Applicators,Advanced Commodities - Tier 4,43,Planetary Commodities
+2873,55,125mm Gatling AutoCannon II,Projectile Weapon,7,Module
+2875,1041,Sterile Conduits,Advanced Commodities - Tier 4,43,Planetary Commodities
+2876,1041,Wetware Mainframe,Advanced Commodities - Tier 4,43,Planetary Commodities
+2897,55,220mm Vulcan AutoCannon II,Projectile Weapon,7,Module
+2913,55,425mm AutoCannon II,Projectile Weapon,7,Module
+3033,53,Small Focused Beam Laser II,Energy Weapon,7,Module
+3041,53,Small Focused Pulse Laser II,Energy Weapon,7,Module
+3082,74,250mm Railgun II,Hybrid Weapon,7,Module
+3244,52,Warp Disruptor II,Warp Scrambler,7,Module
+3256,741,Inherent Implants 'Squire' Power Grid Management EG-602,Cyber Engineering,20,Implant
+3540,62,Large Armor Repairer II,Armor Repair Unit,7,Module
+3568,76,Small Capacitor Booster II,Capacitor Booster,7,Module
+3578,76,Heavy Capacitor Booster II,Capacitor Booster,7,Module
+3645,1042,Water,Basic Commodities - Tier 1,43,Planetary Commodities
+3683,1042,Oxygen,Basic Commodities - Tier 1,43,Planetary Commodities
+3689,1034,Mechanical Parts,Refined Commodities - Tier 2,43,Planetary Commodities
+3691,1034,Synthetic Oil,Refined Commodities - Tier 2,43,Planetary Commodities
+3693,1034,Fertilizer,Refined Commodities - Tier 2,43,Planetary Commodities
+3695,1034,Polytextiles,Refined Commodities - Tier 2,43,Planetary Commodities
+3697,1034,Silicate Glass,Refined Commodities - Tier 2,43,Planetary Commodities
+3725,1034,Livestock,Refined Commodities - Tier 2,43,Planetary Commodities
+3775,1034,Viral Agent,Refined Commodities - Tier 2,43,Planetary Commodities
+3779,1042,Biomass,Basic Commodities - Tier 1,43,Planetary Commodities
+3828,1034,Construction Blocks,Refined Commodities - Tier 2,43,Planetary Commodities
+3831,38,Medium Shield Extender II,Shield Extender,7,Module
+3841,38,Large Shield Extender II,Shield Extender,7,Module
+3888,285,Co-Processor II,CPU Enhancer,7,Module
+4025,65,X5 Enduring Stasis Webifier,Stasis Web,7,Module
+4027,65,Fleeting Compact Stasis Webifier,Stasis Web,7,Module
+4250,650,Small Tractor Beam II,Tractor Beam,7,Module
+4254,339,Micro Auxiliary Power Core II,Auxiliary Power Core,7,Module
+4302,1201,Oracle,Attack Battlecruiser,6,Ship
+4308,1201,Talos,Attack Battlecruiser,6,Ship
+4310,1201,Tornado,Attack Battlecruiser,6,Ship
+4347,77,Pithum A-Type Multispectrum Shield Hardener,Shield Hardener,7,Module
+4383,1189,Large Micro Jump Drive,Micro Jump Drive,7,Module
+4393,645,Drone Damage Amplifier I,Drone Damage Modules,7,Module
+4403,1150,Reactive Armor Hardener,Armor Resistance Shift Hardener,7,Module
+4405,645,Drone Damage Amplifier II,Drone Damage Modules,7,Module
+4435,43,Eutectic Compact Cap Recharger,Capacitor Recharger,7,Module
+4471,71,Small Infectious Scoped Energy Neutralizer,Energy Neutralizer,7,Module
+5141,68,Small Ghoul Compact Energy Nosferatu,Energy Nosferatu,7,Module
+5320,291,Balmer Series Compact Tracking Disruptor I,Weapon Disruptor,7,Module
+5322,291,DDO Scoped Tracking Disruptor I,Weapon Disruptor,7,Module
+5399,52,J5 Enduring Warp Disruptor,Warp Scrambler,7,Module
+5405,52,Initiated Compact Warp Disruptor,Warp Scrambler,7,Module
+5439,52,J5b Enduring Warp Scrambler,Warp Scrambler,7,Module
+5443,52,Faint Epsilon Scoped Warp Scrambler,Warp Scrambler,7,Module
+5445,52,Initiated Compact Warp Scrambler,Warp Scrambler,7,Module
+5839,60,IFFA Compact Damage Control,Damage Control,7,Module
+5849,205,Extruded Compact Heat Sink,Heat Sink,7,Module
+5971,46,5MN Cold-Gas Enduring Microwarpdrive,Propulsion Module,7,Module
+5973,46,5MN Y-T8 Compact Microwarpdrive,Propulsion Module,7,Module
+5975,46,50MN Cold-Gas Enduring Microwarpdrive,Propulsion Module,7,Module
+6005,46,10MN Monopropellant Enduring Afterburner,Propulsion Module,7,Module
+6160,212,F-90 Compact Sensor Booster,Sensor Booster,7,Module
+6296,210,F-89 Compact Signal Amplifier,Signal Amplifier,7,Module
+8027,511,Prototype 'Arbalest' Rapid Light Missile Launcher,Missile Launcher Rapid Light,7,Module
+8433,38,Medium Azeotropic Restrained Shield Extender,Shield Extender,7,Module
+8517,38,Medium F-S9 Regolith Compact Shield Extender,Shield Extender,7,Module
+8521,38,Small F-S9 Regolith Compact Shield Extender,Shield Extender,7,Module
+8529,38,Large F-S9 Regolith Compact Shield Extender,Shield Extender,7,Module
+8635,41,Large Murky Compact Remote Shield Booster,Remote Shield Booster,7,Module
+9632,77,Compact Multispectrum Shield Hardener,Shield Hardener,7,Module
+9800,72,'YF-12a' Compact Medium Plasma Smartbomb,Smart Bomb,7,Module
+9828,1042,Silicon,Basic Commodities - Tier 1,43,Planetary Commodities
+9830,1034,Rocket Fuel,Refined Commodities - Tier 2,43,Planetary Commodities
+9832,1034,Coolant,Refined Commodities - Tier 2,43,Planetary Commodities
+9834,1040,Guidance Systems,Specialized Commodities - Tier 3,43,Planetary Commodities
+9836,1034,Consumer Electronics,Refined Commodities - Tier 2,43,Planetary Commodities
+9838,1034,Superconductors,Refined Commodities - Tier 2,43,Planetary Commodities
+9840,1034,Transmitter,Refined Commodities - Tier 2,43,Planetary Commodities
+9842,1034,Miniature Electronics,Refined Commodities - Tier 2,43,Planetary Commodities
+9846,1040,Planetary Vehicles,Specialized Commodities - Tier 3,43,Planetary Commodities
+9848,1040,Robotics,Specialized Commodities - Tier 3,43,Planetary Commodities
+10190,302,Magnetic Field Stabilizer II,Magnetic Field Stabilizer,7,Module
+10998,315,Warp Core Stabilizer I,Warp Core Stabilizer,7,Module
+11129,31,Gallente Shuttle,Shuttle,6,Ship
+11174,893,Keres,Electronic Attack Ship,6,Ship
+11178,831,Raptor,Interceptor,6,Ship
+11182,830,Cheetah,Covert Ops,6,Ship
+11184,831,Crusader,Interceptor,6,Ship
+11186,831,Malediction,Interceptor,6,Ship
+11192,830,Buzzard,Covert Ops,6,Ship
+11194,893,Kitsune,Electronic Attack Ship,6,Ship
+11196,831,Claw,Interceptor,6,Ship
+11198,831,Stiletto,Interceptor,6,Ship
+11325,329,1600mm Rolled Tungsten Compact Plates,Armor Plate,7,Module
+11370,330,Prototype Cloaking Device I,Cloaking Device,7,Module
+11371,324,Wolf,Assault Frigate,6,Ship
+11377,834,Nemesis,Stealth Bomber,6,Ship
+11381,324,Harpy,Assault Frigate,6,Ship
+11387,893,Hyena,Electronic Attack Ship,6,Ship
+11563,339,Micro Auxiliary Power Core I,Auxiliary Power Core,7,Module
+11578,330,Covert Ops Cloaking Device II,Cloaking Device,7,Module
+11961,906,Huginn,Combat Recon Ship,6,Ship
+11963,833,Rapier,Force Recon Ship,6,Ship
+11978,832,Scimitar,Logistics,6,Ship
+11987,832,Guardian,Logistics,6,Ship
+11989,832,Oneiros,Logistics,6,Ship
+11993,358,Cerberus,Heavy Assault Cruiser,6,Ship
+11999,358,Vagabond,Heavy Assault Cruiser,6,Ship
+12003,358,Zealot,Heavy Assault Cruiser,6,Ship
+12005,358,Ishtar,Heavy Assault Cruiser,6,Ship
+12011,358,Eagle,Heavy Assault Cruiser,6,Ship
+12015,358,Muninn,Heavy Assault Cruiser,6,Ship
+12017,894,Devoter,Heavy Interdiction Cruiser,6,Ship
+12021,894,Phobos,Heavy Interdiction Cruiser,6,Ship
+12023,358,Deimos,Heavy Assault Cruiser,6,Ship
+12034,834,Hound,Stealth Bomber,6,Ship
+12044,324,Enyo,Assault Frigate,6,Ship
+12058,46,10MN Afterburner II,Propulsion Module,7,Module
+12263,68,Heavy Energy Nosferatu II,Energy Nosferatu,7,Module
+12267,71,Medium Energy Neutralizer II,Energy Neutralizer,7,Module
+12633,376,Tremor S,Advanced Artillery Ammo,8,Charge
+12743,1202,Viator,Blockade Runner,6,Ship
+12773,372,Barrage M,Advanced Autocannon Ammo,8,Charge
+12777,372,Hail M,Advanced Autocannon Ammo,8,Charge
+12789,377,Void M,Advanced Blaster Charge,8,Charge
+12801,373,Javelin M,Advanced Railgun Charge,8,Charge
+12805,373,Spike M,Advanced Railgun Charge,8,Charge
+12836,1040,Transcranial Microcontrollers,Specialized Commodities - Tier 3,43,Planetary Commodities
+13001,68,Small Energy Nosferatu II,Energy Nosferatu,7,Module
+13978,328,True Sansha Kinetic Armor Hardener,Armor Hardener,7,Module
+14242,52,Dark Blood Warp Disruptor,Warp Scrambler,7,Module
+14252,52,Dark Blood Warp Scrambler,Warp Scrambler,7,Module
+14262,65,Dark Blood Stasis Webifier,Stasis Web,7,Module
+15317,1034,Genetically Enhanced Livestock,Refined Commodities - Tier 2,43,Planetary Commodities
+15683,367,Republic Fleet Ballistic Control System,Ballistic Control system,7,Module
+15725,326,Imperial Navy Explosive Energized Membrane,Energized Armor Membrane,7,Module
+15770,46,Federation Navy 100MN Afterburner,Propulsion Module,7,Module
+15889,52,Caldari Navy Warp Disruptor,Warp Scrambler,7,Module
+15891,52,Republic Fleet Warp Disruptor,Warp Scrambler,7,Module
+16061,511,Caldari Navy Rapid Light Missile Launcher,Missile Launcher Rapid Light,7,Module
+16227,419,Ferox,Combat Battlecruiser,6,Ship
+16231,419,Cyclone,Combat Battlecruiser,6,Ship
+16233,419,Prophecy,Combat Battlecruiser,6,Ship
+16236,420,Coercer,Destroyer,6,Ship
+16238,420,Cormorant,Destroyer,6,Ship
+16240,420,Catalyst,Destroyer,6,Ship
+16242,420,Thrasher,Destroyer,6,Ship
+16475,71,Heavy Gremlin Compact Energy Neutralizer,Energy Neutralizer,7,Module
+16477,71,Heavy Infectious Scoped Energy Neutralizer,Energy Neutralizer,7,Module
+16487,67,Large Inductive Compact Remote Capacitor Transmitter,Remote Capacitor Transmitter,7,Module
+16633,427,Hydrocarbons,Moon Materials,4,Material
+16634,427,Atmospheric Gases,Moon Materials,4,Material
+16635,427,Evaporite Deposits,Moon Materials,4,Material
+16636,427,Silicates,Moon Materials,4,Material
+16637,427,Tungsten,Moon Materials,4,Material
+16638,427,Titanium,Moon Materials,4,Material
+16639,427,Scandium,Moon Materials,4,Material
+16640,427,Cobalt,Moon Materials,4,Material
+16641,427,Chromium,Moon Materials,4,Material
+16642,427,Vanadium,Moon Materials,4,Material
+16643,427,Cadmium,Moon Materials,4,Material
+16644,427,Platinum,Moon Materials,4,Material
+16646,427,Mercury,Moon Materials,4,Material
+16647,427,Caesium,Moon Materials,4,Material
+16648,427,Hafnium,Moon Materials,4,Material
+16649,427,Technetium,Moon Materials,4,Material
+16650,427,Dysprosium,Moon Materials,4,Material
+16651,427,Neodymium,Moon Materials,4,Material
+16652,427,Promethium,Moon Materials,4,Material
+16653,427,Thulium,Moon Materials,4,Material
+17136,1040,Ukomi Superconductors,Specialized Commodities - Tier 3,43,Planetary Commodities
+17392,1040,Data Chips,Specialized Commodities - Tier 3,43,Planetary Commodities
+17480,463,Procurer,Mining Barge,6,Ship
+17559,65,Federation Navy Stasis Webifier,Stasis Web,7,Module
+17715,26,Gila,Cruiser,6,Ship
+17720,26,Cynabal,Cruiser,6,Ship
+17722,26,Vigilant,Cruiser,6,Ship
+17732,27,Tempest Fleet Issue,Battleship,6,Ship
+17736,27,Nightmare,Battleship,6,Ship
+17740,27,Vindicator,Battleship,6,Ship
+17898,1040,High-Tech Transmitters,Specialized Commodities - Tier 3,43,Planetary Commodities
+17920,27,Bhaalgorn,Battleship,6,Ship
+18639,481,Expanded Probe Launcher I,Scan Probe Launcher,7,Module
+18698,46,Core X-Type 100MN Afterburner,Propulsion Module,7,Module
+18710,98,Centii A-Type Multispectrum Coating,Armor Coating,7,Module
+18791,98,Coreli A-Type Kinetic Coating,Armor Coating,7,Module
+18793,98,Coreli A-Type Explosive Coating,Armor Coating,7,Module
+18797,98,Coreli A-Type Thermal Coating,Armor Coating,7,Module
+18985,325,Coreli A-Type Small Remote Armor Repairer,Remote Armor Repairer,7,Module
+19015,62,Coreli A-Type Small Armor Repairer,Armor Repair Unit,7,Module
+19085,67,Centum B-Type Medium Remote Capacitor Transmitter,Remote Capacitor Transmitter,7,Module
+19107,68,Corpum C-Type Medium Energy Nosferatu,Energy Nosferatu,7,Module
+19111,68,Corpum A-Type Medium Energy Nosferatu,Energy Nosferatu,7,Module
+19147,41,Pithum C-Type Medium Remote Shield Booster,Remote Shield Booster,7,Module
+19187,40,Pithum C-Type Medium Shield Booster,Shield Booster,7,Module
+19191,40,Pithum A-Type Medium Shield Booster,Shield Booster,7,Module
+19203,40,Pith B-Type Large Shield Booster,Shield Booster,7,Module
+19207,40,Pith X-Type Large Shield Booster,Shield Booster,7,Module
+19209,295,Pithum C-Type Explosive Shield Amplifier,Shield Resistance Amplifier,7,Module
+19211,295,Pithum C-Type Thermal Shield Amplifier,Shield Resistance Amplifier,7,Module
+19215,295,Pithum C-Type EM Shield Amplifier,Shield Resistance Amplifier,7,Module
+19231,295,Pithum A-Type EM Shield Amplifier,Shield Resistance Amplifier,7,Module
+19264,77,Pith C-Type EM Shield Hardener,Shield Hardener,7,Module
+19295,338,Pith X-Type Shield Boost Amplifier,Shield Boost Amplifier,7,Module
+19325,46,Coreli A-Type 5MN Microwarpdrive,Propulsion Module,7,Module
+19339,46,Gistum C-Type 50MN Microwarpdrive,Propulsion Module,7,Module
+19744,28,Sigil,Hauler,6,Ship
+19806,379,Target Painter II,Target Painter,7,Module
+19810,379,Peripheral Compact Target Painter,Target Painter,7,Module
+20125,906,Curse,Combat Recon Ship,6,Ship
+21096,658,Cynosural Field Generator I,Cynosural Field Generator,7,Module
+21922,83,Republic Fleet Phased Plasma M,Projectile Ammo,8,Charge
+21924,83,Republic Fleet Phased Plasma S,Projectile Ammo,8,Charge
+22175,538,Data Analyzer I,Data Miners,7,Module
+22291,367,Ballistic Control System II,Ballistic Control system,7,Module
+22428,898,Redeemer,Black Ops,6,Ship
+22440,898,Panther,Black Ops,6,Ship
+22444,540,Sleipnir,Command Ship,6,Ship
+22446,540,Vulture,Command Ship,6,Ship
+22456,541,Sabre,Interdictor,6,Ship
+22464,541,Flycatcher,Interdictor,6,Ship
+22468,540,Claymore,Command Ship,6,Ship
+22470,540,Nighthawk,Command Ship,6,Ship
+22474,540,Damnation,Command Ship,6,Ship
+22544,543,Hulk,Exhumer,6,Ship
+22782,589,Interdiction Sphere Launcher I,Interdiction Sphere Launcher,7,Module
+23025,85,Caldari Navy Antimatter Charge M,Hybrid Charge,8,Charge
+23029,85,Caldari Navy Uranium Charge M,Hybrid Charge,8,Charge
+23031,85,Caldari Navy Thorium Charge M,Hybrid Charge,8,Charge
+23035,85,Caldari Navy Iridium Charge M,Hybrid Charge,8,Charge
+23039,85,Caldari Navy Iron Charge M,Hybrid Charge,8,Charge
+23045,85,Caldari Navy Thorium Charge L,Hybrid Charge,8,Charge
+23079,86,Imperial Navy Standard S,Frequency Crystal,8,Charge
+23113,86,Imperial Navy Standard L,Frequency Crystal,8,Charge
+23119,86,Imperial Navy Radio L,Frequency Crystal,8,Charge
+23527,647,Drone Link Augmentor I,Drone Control Range Module,7,Module
+23707,639,Hornet EC-300,Electronic Warfare Drone,18,Drone
+23711,640,Light Armor Maintenance Bot I,Logistic Drone,18,Drone
+24348,650,Small Tractor Beam I,Tractor Beam,7,Module
+24427,647,Drone Link Augmentor II,Drone Control Range Module,7,Module
+24492,654,Scourge Javelin Heavy Assault Missile,Advanced Heavy Assault Missile,8,Charge
+24495,653,Scourge Fury Light Missile,Advanced Light Missile,8,Charge
+24497,653,Nova Fury Light Missile,Advanced Light Missile,8,Charge
+24499,653,Inferno Fury Light Missile,Advanced Light Missile,8,Charge
+24509,655,Mjolnir Fury Heavy Missile,Advanced Heavy Missile,8,Charge
+24688,27,Rokh,Battleship,6,Ship
+24698,419,Drake,Combat Battlecruiser,6,Ship
+24700,419,Myrmidon,Combat Battlecruiser,6,Ship
+24702,419,Hurricane,Combat Battlecruiser,6,Ship
+25894,773,Large Trimark Armor Pump I,Rig Armor,7,Module
+25898,773,Large Nanobot Accelerator I,Rig Armor,7,Module
+26058,782,Large Low Friction Nozzle Joints I,Rig Navigation,7,Module
+26076,774,Large EM Shield Reinforcer I,Rig Shield,7,Module
+26088,774,Large Core Defense Field Extender I,Rig Shield,7,Module
+26296,773,Large Nanobot Accelerator II,Rig Armor,7,Module
+26302,773,Large Trimark Armor Pump II,Rig Armor,7,Module
+26312,782,Large Polycarbon Engine Housing II,Rig Navigation,7,Module
+26370,781,Large Ancillary Current Router II,Rig Core,7,Module
+26436,774,Large EM Shield Reinforcer II,Rig Shield,7,Module
+26448,774,Large Core Defense Field Extender II,Rig Shield,7,Module
+26929,781,Small Processor Overclocking Unit I,Rig Core,7,Module
+27361,384,Caldari Navy Scourge Light Missile,Light Missile,8,Charge
+27371,384,Caldari Navy Inferno Light Missile,Light Missile,8,Charge
+27381,384,Caldari Navy Nova Light Missile,Light Missile,8,Charge
+27387,384,Caldari Navy Mjolnir Light Missile,Light Missile,8,Charge
+27914,862,Bomb Launcher I,Missile Launcher Bomb,7,Module
+28336,83,Republic Fleet Depleted Uranium S,Projectile Ammo,8,Charge
+28659,900,Paladin,Marauder,6,Ship
+28661,900,Kronos,Marauder,6,Ship
+28665,900,Vargur,Marauder,6,Ship
+28668,916,Nanite Repair Paste,Nanite Repair Paste,8,Charge
+28678,303,Synth Frentix Booster,Booster,20,Implant
+28710,900,Golem,Marauder,6,Ship
+28756,481,Sisters Expanded Probe Launcher,Scan Probe Launcher,7,Module
+28974,1040,Vaccines,Specialized Commodities - Tier 3,43,Planetary Commodities
+28999,907,Optimal Range Script,Tracking Script,8,Charge
+29001,907,Tracking Speed Script,Tracking Script,8,Charge
+29003,908,Focused Warp Disruption Script,Warp Disruption Script,8,Charge
+29007,909,Tracking Speed Disruption Script,Tracking Disruption Script,8,Charge
+29009,910,Targeting Range Script,Sensor Booster Script,8,Charge
+29011,910,Scan Resolution Script,Sensor Booster Script,8,Charge
+29248,25,Magnate,Frigate,6,Ship
+29340,26,Osprey Navy Issue,Cruiser,6,Ship
+29344,26,Exequror Navy Issue,Cruiser,6,Ship
+29984,963,Tengu,Strategic Cruiser,6,Ship
+30486,479,Sisters Combat Scanner Probe,Scanner Probe,8,Charge
+30488,479,Sisters Core Scanner Probe,Scanner Probe,8,Charge
+31045,773,Small Auxiliary Nano Pump I,Rig Armor,7,Module
+31047,773,Medium Auxiliary Nano Pump I,Rig Armor,7,Module
+31051,773,Small Auxiliary Nano Pump II,Rig Armor,7,Module
+31053,773,Medium Auxiliary Nano Pump II,Rig Armor,7,Module
+31055,773,Medium Trimark Armor Pump I,Rig Armor,7,Module
+31057,773,Small Trimark Armor Pump II,Rig Armor,7,Module
+31059,773,Medium Trimark Armor Pump II,Rig Armor,7,Module
+31083,1232,Small Salvage Tackle I,Rig Resource Processing,7,Module
+31153,782,Small Low Friction Nozzle Joints I,Rig Navigation,7,Module
+31159,782,Small Hyperspatial Velocity Optimizer I,Rig Navigation,7,Module
+31161,782,Medium Hyperspatial Velocity Optimizer I,Rig Navigation,7,Module
+31165,782,Small Hyperspatial Velocity Optimizer II,Rig Navigation,7,Module
+31167,782,Medium Hyperspatial Velocity Optimizer II,Rig Navigation,7,Module
+31171,782,Small Low Friction Nozzle Joints II,Rig Navigation,7,Module
+31173,782,Medium Low Friction Nozzle Joints II,Rig Navigation,7,Module
+31213,1233,Small Gravity Capacitor Upgrade I,Rig Scanning,7,Module
+31322,1234,Small Targeting System Subcontroller I,Rig Targeting,7,Module
+31330,1234,Medium Targeting System Subcontroller II,Rig Targeting,7,Module
+31358,781,Small Ancillary Current Router I,Rig Core,7,Module
+31360,781,Medium Ancillary Current Router I,Rig Core,7,Module
+31366,781,Medium Ancillary Current Router II,Rig Core,7,Module
+31372,781,Medium Capacitor Control Circuit I,Rig Core,7,Module
+31378,781,Medium Capacitor Control Circuit II,Rig Core,7,Module
+31408,781,Medium Semiconductor Memory Cell I,Rig Core,7,Module
+31562,776,Small Hybrid Locus Coordinator I,Rig Hybrid Weapon,7,Module
+31586,779,Small Bay Loading Accelerator I,Rig Launcher,7,Module
+31588,779,Medium Bay Loading Accelerator I,Rig Launcher,7,Module
+31594,779,Medium Bay Loading Accelerator II,Rig Launcher,7,Module
+31600,779,Medium Hydraulic Bay Thrusters I,Rig Launcher,7,Module
+31616,779,Medium Rocket Fuel Cache Partition II,Rig Launcher,7,Module
+31628,779,Medium Warhead Calefaction Catalyst II,Rig Launcher,7,Module
+31716,774,Small EM Shield Reinforcer I,Rig Shield,7,Module
+31718,774,Medium EM Shield Reinforcer I,Rig Shield,7,Module
+31722,774,Small EM Shield Reinforcer II,Rig Shield,7,Module
+31724,774,Medium EM Shield Reinforcer II,Rig Shield,7,Module
+31742,774,Medium Kinetic Shield Reinforcer I,Rig Shield,7,Module
+31748,774,Medium Kinetic Shield Reinforcer II,Rig Shield,7,Module
+31754,774,Medium Thermal Shield Reinforcer I,Rig Shield,7,Module
+31788,774,Small Core Defense Field Extender I,Rig Shield,7,Module
+31790,774,Medium Core Defense Field Extender I,Rig Shield,7,Module
+31794,774,Small Core Defense Field Extender II,Rig Shield,7,Module
+31796,774,Medium Core Defense Field Extender II,Rig Shield,7,Module
+31800,774,Small Core Defense Field Purger I,Rig Shield,7,Module
+31802,774,Medium Core Defense Field Purger I,Rig Shield,7,Module
+31812,774,Medium Core Defense Field Purger II,Rig Shield,7,Module
+31900,329,Imperial Navy 1600mm Steel Plates,Armor Plate,7,Module
+31932,38,Republic Fleet Large Shield Extender,Shield Extender,7,Module
+32006,87,Navy Cap Booster 400,Capacitor Booster Charge,8,Charge
+32772,1156,Medium Ancillary Shield Booster,Ancillary Shield Booster,7,Module
+32782,88,Defender Missile I,Defender Missiles,8,Charge
+32872,420,Algos,Destroyer,6,Ship
+32874,420,Dragoon,Destroyer,6,Ship
+32876,420,Corax,Destroyer,6,Ship
+32878,420,Talwar,Destroyer,6,Ship
+33076,1199,Small Ancillary Armor Repairer,Ancillary Armor Repairer,7,Module
+33157,419,Hurricane Fleet Issue,Combat Battlecruiser,6,Ship
+33468,25,Astero,Frigate,6,Ship
+33818,26,Orthrus,Cruiser,6,Ship
+33892,773,Small Transverse Bulkhead II,Rig Armor,7,Module
+33915,1189,Medium Micro Jump Drive,Micro Jump Drive,7,Module
+34268,1308,Medium Higgs Anchor I,Rig Anchor,7,Module
+34562,1305,Svipul,Tactical Destroyer,6,Ship
+34593,1313,Entosis Link I,Entosis Link,7,Module
+35656,46,10MN Y-S8 Compact Afterburner,Propulsion Module,7,Module
+35657,46,100MN Y-S8 Compact Afterburner,Propulsion Module,7,Module
+35658,46,5MN Quad LiF Restrained Microwarpdrive,Propulsion Module,7,Module
+35659,46,50MN Y-T8 Compact Microwarpdrive,Propulsion Module,7,Module
+35660,46,50MN Quad LiF Restrained Microwarpdrive,Propulsion Module,7,Module
+35662,46,500MN Quad LiF Restrained Microwarpdrive,Propulsion Module,7,Module
+35794,1400,Missile Range Script,Missile Guidance Script,8,Charge
+37457,1527,Deacon,Logistics Frigate,6,Ship
+37458,1527,Kirin,Logistics Frigate,6,Ship
+37460,1527,Scalpel,Logistics Frigate,6,Ship
+37479,1533,Micro Jump Field Generator,Micro Jump Field Generators,7,Module
+37480,1534,Bifrost,Command Destroyer,6,Ship
+37482,1534,Stork,Command Destroyer,6,Ship
+41062,52,Federation Navy Warp Disruptor,Warp Scrambler,7,Module
+41212,61,Republic Fleet Small Cap Battery,Capacitor Battery,7,Module
+41214,61,Thukker Small Cap Battery,Capacitor Battery,7,Module
+41215,61,Republic Fleet Medium Cap Battery,Capacitor Battery,7,Module
+41217,61,Thukker Medium Cap Battery,Capacitor Battery,7,Module
+41218,61,Republic Fleet Large Cap Battery,Capacitor Battery,7,Module
+41220,61,Thukker Large Cap Battery,Capacitor Battery,7,Module
+41477,1698,Medium Ancillary Remote Armor Repairer,Ancillary Remote Armor Repairer,7,Module
+42530,1770,Skirmish Command Burst I,Command Burst,7,Module
+42694,1769,Active Shielding Charge,Shield Command Burst Charges,8,Charge
+42695,1769,Shield Harmonizing Charge,Shield Command Burst Charges,8,Charge
+42696,1769,Shield Extension Charge,Shield Command Burst Charges,8,Charge
+42834,1774,Armor Reinforcement Charge,Armor Command Burst Charges,8,Charge
+42835,1773,Sensor Optimization Charge,Information Command Burst Charges,8,Charge
+42836,1773,Electronic Superiority Charge,Information Command Burst Charges,8,Charge
+42837,1773,Electronic Hardening Charge,Information Command Burst Charges,8,Charge
+42840,1772,Rapid Deployment Charge,Skirmish Command Burst Charges,8,Charge
+43552,1770,Armor Command Burst II,Command Burst,7,Module
+43554,1770,Information Command Burst II,Command Burst,7,Module
+43556,1770,Skirmish Command Burst II,Command Burst,7,Module
+43896,781,Medium Command Processor I,Rig Core,7,Module
+44102,512,Defender Launcher I,Missile Launcher Defender,7,Module
+44993,830,Pacifier,Covert Ops,6,Ship
+45534,1972,Monitor,Flag Cruiser,6,Ship
+45591,954,Tengu Defensive - Amplification Node,Defensive Subsystem,32,Subsystem
+45601,956,Tengu Offensive - Accelerated Ejection Bay,Offensive Subsystem,32,Subsystem
+45609,956,Loki Offensive - Support Processor,Offensive Subsystem,32,Subsystem
+45615,957,Tengu Propulsion - Fuel Catalyst,Propulsion Subsystem,32,Subsystem
+45621,957,Loki Propulsion - Wake Limiter,Propulsion Subsystem,32,Subsystem
+45626,958,Tengu Core - Augmented Graviton Reactor,Core Subsystem,32,Subsystem
+46006,303,Agency 'Overclocker' SB7 Dose III,Booster,20,Implant
+47255,60,EFFA Compact Assault Damage Control,Damage Control,7,Module
+47257,60,Assault Damage Control II,Damage Control,7,Module
+47270,26,Vedmak,Cruiser,6,Ship
+47911,1988,Entropic Radiation Sink II,Entropic Radiation Sink,7,Module
+47934,1989,Occult L,Advanced Exotic Plasma Charge,8,Charge
+49710,420,Kikimora,Destroyer,6,Ship
+52254,1534,Draugur,Command Destroyer,6,Ship
+62590,515,Medium Industrial Core I,Siege Module,7,Module
+72811,419,Cyclone Fleet Issue,Combat Battlecruiser,6,Ship
+72812,419,Ferox Navy Issue,Combat Battlecruiser,6,Ship
+78369,419,Khizriel,Combat Battlecruiser,6,Ship
+81008,28,Squall,Hauler,6,Ship
+52252,358,Ikitursa,Heavy Assault Cruiser,6,Ship
