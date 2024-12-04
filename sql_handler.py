@@ -1,96 +1,184 @@
 import sqlite3
 import os
 import json
-import polars as ps
+import polars as pl
 from datetime import datetime
-from typing import List
-from typing import Optional
+from typing import List, Optional
 
-import sqlalchemy
-from sqlalchemy import ForeignKey, Engine
-from sqlalchemy import String
-from sqlalchemy.orm import DeclarativeBase, Session
-from sqlalchemy.orm import Mapped
-from sqlalchemy.orm import mapped_column
-from sqlalchemy.orm import relationship
-from sqlalchemy import MetaData
-from sqlalchemy import Table, Column, Integer, String
+from sqlalchemy import create_engine, ForeignKey, String, MetaData, Table, Column, Integer, Float, DateTime, Boolean, \
+    PrimaryKeyConstraint
+from sqlalchemy.orm import DeclarativeBase, Session, Mapped, mapped_column, relationship
 
 sql_file = 'market_orders.sqlite'
 data_path = 'data/mkt_orders_raw.json'
-new_cols = ['type_id', 'volume_remain', 'price', 'issued', 'duration',, 'is_buy_order']
+market_columns = [
+    'type_id',
+    'volume_remain',
+    'price',
+    'issued',
+    'duration',
+    'order_id',
+    'is_buy_order'
+]
+history_columns = ['date', 'type_id', 'average', 'highest', 'lowest', 'order_count', 'volume']
+
+history_path = 'data/master_history/all_history'
+
+
+# with open(json_path, 'r') as f:
+#     data = json.load(f)
 
 class Base(DeclarativeBase):
     pass
 
 
-class Market_Order(Base):
+class MarketOrder(Base):
     __tablename__ = "market_order"
+
     order_id: Mapped[int] = mapped_column(primary_key=True)
     type_id: Mapped[str] = mapped_column(String(10))
-    type_name: Mapped[Optional[str]]
-    volume_remain: Mapped[int]
-    price: Mapped[float]
-    issued: Mapped[datetime]
-    duration: Mapped[int]
-    is_buy_order: Mapped[bool]
+    type_name: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    volume_remain: Mapped[int] = mapped_column(Integer)
+    price: Mapped[float] = mapped_column(Float)
+    issued: Mapped[datetime] = mapped_column(DateTime)
+    duration: Mapped[int] = mapped_column(Integer)
+    is_buy_order: Mapped[bool] = mapped_column(Boolean)
 
 
-with open(data_path, 'r') as f:
-    data = json.load(f)
-data = data
-df = ps.DataFrame(data)
+class MarketHistory(Base):
+    __tablename__ = "market_history"
+    date: Mapped[datetime] = mapped_column(DateTime)
+    type_id: Mapped[str] = mapped_column(String(10))
+    average: Mapped[float] = mapped_column(Float)
+    volume: Mapped[int] = mapped_column(Integer)
+    highest: Mapped[float] = mapped_column(Float)
+    lowest: Mapped[float] = mapped_column(Float)
+    order_count: Mapped[int] = mapped_column(Integer)
+
+    # Add composite primary key
+    __table_args__ = (
+        PrimaryKeyConstraint('date', 'type_id'),
+    )
 
 
-def process_data(df: ps.DataFrame, new_columns: list = None, date_column_name: str = None):
-    df = reorder_columns(df, new_columns)
-    if date_column_name:
-        df2 = convert_date(df, date_column_name)
-        return df2
+def process_dataframe(df: pl.DataFrame, columns: list, date_column: str = None) -> pl.DataFrame:
+    """Process the dataframe by selecting columns and converting dates."""
+    # Select only the specified columns
+    df = df.select(columns)
+
+    if date_column is None:
+        if 'date' in df.columns:
+            date_column = 'date'
+        elif 'issued' in df.columns:
+            date_column = 'issued'
+        else:
+            date_column = None
+
+    # Convert  date strings to datetime objects
+    if date_column:
+        df = df.with_columns([
+            pl.col(date_column).str.strptime(pl.Datetime).alias(date_column)
+        ])
+
+    return df
+
+
+def initialize_database(engine, base):
+    """Create all database tables."""
+    base.metadata.create_all(engine)
+
+
+def load_data_to_db(data: dict, db_path: str, columns: List[str], is_history: Boolean = False):
+    """Load JSON data into SQLite database."""
+    # Create SQLAlchemy engine
+    engine = create_engine(f"sqlite:///{db_path}", echo=False)
+
+    # Initialize database tables
+    initialize_database(engine, Base)
+
+    # Load and process data
+
+    df = pl.DataFrame(data)
+    df_processed = process_dataframe(df, columns)
+
+    # Convert to records for insertion
+    records = df_processed.to_dicts()
+
+    # Insert data in batches
+    batch_size = 1000
+    with Session(engine) as session:
+        try:
+            for i in range(0, len(records), batch_size):
+                batch = records[i:i + batch_size]
+
+                if is_history:
+                    market_orders = [MarketHistory(**record) for record in batch]
+                else:
+                    market_orders = [MarketOrder(**record) for record in batch]
+
+                session.add_all(market_orders)
+                session.commit()
+                print(f"Inserted records {i} to {min(i + batch_size, len(records))}")
+        except Exception as e:
+            session.rollback()
+            print(f"Error inserting data: {str(e)}")
+            raise
+        finally:
+            session.close()
+
+
+def load_market_history(json_path: str, db_path: str, columns: List[str]):
+    engine = create_engine(f"sqlite:///{db_path}", echo=False)
+
+    stmt = """
+    INSERT INTO market_history 
+        (date, type_id, average, volume, highest, lowest, order_count)
+    VALUES 
+        (:date, :type_id, :average, :volume, :highest, :lowest, :order_count)
+    ON CONFLICT(date, type_id) DO UPDATE SET
+        average = EXCLUDED.average,
+        volume = EXCLUDED.volume,
+        highest = EXCLUDED.highest,
+        lowest = EXCLUDED.lowest,
+        order_count = EXCLUDED.order_count
+    """
+
+    with open(json_path, 'r') as f:
+        data = json.load(f)
+
+    df = pl.DataFrame(data)
+    df_processed = process_dataframe(df, columns)
+    records = df_processed.to_dicts()
+
+    batch_size = 1000
+    with engine.begin() as conn:
+        try:
+            for i in range(0, len(records), batch_size):
+                batch = records[i:i + batch_size]
+                conn.execute(text(stmt), batch)
+                print(f"Processed records {i} to {min(i + batch_size, len(records))}")
+        except Exception as e:
+            print(f"Error inserting data: {str(e)}")
+            raise
+
+
+def process_esi_market_order(data: dict, is_history: Boolean = False) -> dict:
+    if is_history:
+        columns = history_columns
     else:
-        print('No date column name provided')
-        return df
+        columns = market_columns
 
-
-def reorder_columns(df: ps.DataFrame, new_columns: list = None):
-    if new_columns:
-        print('reordering columns')
-        df2 = df.select(new_cols)
-        return df2
-    else:
-        print('no new column order selected')
-        return df
-
-
-def convert_date(df: ps.DataFrame, column_name: str):
-    s = df[column_name].to_list()
-    print(f'converting ISO formatted dates in {column_name} to datetime objects')
-    new_dates = []
-    for date in s:
-        new_date = datetime.fromisoformat(date.replace("Z", "+00:00"))
-        new_dates.append(new_date)
-    new_dates = ps.Series('issued', new_dates)
-    col_index: int = df.get_column_index(column_name)
-    df2 = df.replace_column(col_index, new_dates)
-    return df2
+    try:
+        load_data_to_db(data, sql_file, columns, is_history=is_history)
+        status = "Data loading completed successfully!"
+    except Exception as e:
+        print(f"Failed to load data: {str(e)}")
+        status = "failed"
+    return status
 
 
 if __name__ == '__main__':
-    new_cols = ['type_id', 'volume_remain', 'price', 'issued', 'duration', 'order_id', 'is_buy_order']
-    old_cols = ['duration', 'is_buy_order', 'issued', 'location_id', 'min_volume', 'order_id', 'price', 'range',
-                'type_id', 'volume_remain', 'volume_total']
-
-    df = ps.DataFrame(data)
-    df2 = process_data(df, new_cols, 'issued')
-
-    data_dict = {}
-    for item in data:
-        data_dict = {
-            'type_id': item['type_id'],
-            'volume_remain': item['volume_remain'],
-            'price': item['price'],
-            'issued': item['issued'],
-            'duration': item['duration'],
-            'order_id': item['order_id'],
-            'is_buy_order': item['is_buy_order']
-        }
+    print('Starting...')
+    #
+    # print(type(history_data))
+    # process_esi_market_order(data=history_data, is_history=True)
