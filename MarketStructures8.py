@@ -1,3 +1,4 @@
+import json
 import os
 import requests
 import time
@@ -451,20 +452,23 @@ if __name__ == '__main__':
     print("starting data pull...market orders")
 
     # Configure to run in an abbreviated test mode....
-    test_mode, csv_save_mode = configuration_mode()
 
-    if test_mode:
-        idslocation = 'data/type_ids2.csv.'
-        market_orders = fetch_market_orders(test_mode)
-    else:
-        idslocation = 'data/type_ids.csv.'
-        market_orders = fetch_market_orders_standard()
+    idslocation = 'data/type_ids2.csv.'
+    market_orders = fetch_market_orders_standard()
+    #
+    # idslocation = 'data/type_ids.csv.'
+    # market_orders = fetch_market_orders_standard()
 
 
     Mkt_time_to_complete = datetime.now() - start_time
     Avg_market_response_time = (Mkt_time_to_complete.microseconds / len(market_orders)) / 1000
     print(
         f'done. Time to complete market orders: {Mkt_time_to_complete}, avg market response time: {Avg_market_response_time}ms')
+
+    with open('data/mkt_orders_raw.json', 'w') as outfile:
+        json.dump(market_orders, outfile)
+
+    print("market orders saved to file")
 
     # code for retrieving type ids
     type_idsCSV = pd.read_csv(idslocation)
@@ -481,6 +485,7 @@ if __name__ == '__main__':
 
     # process data
     orders = pd.DataFrame(market_orders)
+
     new_filtered_orders = filterorders(type_ids, orders)
     merged_sell_orders = aggregate_sell_orders(new_filtered_orders)
     merge_market_stats(merged_sell_orders, historical_df)
@@ -488,35 +493,36 @@ if __name__ == '__main__':
     final_data = merge_market_stats(merged_sell_orders, historical_df)
     vale_jita = get_jita_prices(final_data)
 
-    # save files
-    if csv_save_mode:
-        print("-----------saving files and exiting----------------")
-
-        save_to_csv(market_orders, orders_filename)
-        # reorder history columns
-        new_columns = ['date', 'type_id', 'highest', 'lowest', 'average', 'order_count', 'volume']
-        historical_df = historical_df[new_columns]
-        historical_df.to_csv(history_filename, index=False)
-        final_data.to_csv(market_stats_filename, index=False)
-
-        #save a copy of market stats to update spreadsheet consistently named
-        src_folder = r"output"
-        latest_folder = os.path.join(src_folder, "latest")
-        archive_folder = os.path.join(src_folder, "archive")
-        #cleanup files. "Full cleanup true" moves old files from output to archive.
-        rename_move_and_archive_csv(src_folder, latest_folder, archive_folder, True)
-
-        print("saving vale_jita data")
-        vale_jita.to_csv('output/latest/vale_jita.csv', index=False)
-    # Completed stats
-    finish_time = datetime.now()
-    total_time = finish_time - start_time
-
-    print("===================================================")
-    print("ESI Request Completed Successfully.")
-    print(f"Data for {len(final_data)} items retrieved.")
-    print("=====================================================")
-    print(
-        f"Time to complete:\nMARKET ORDERS: {Mkt_time_to_complete}, avg: {Avg_market_response_time}\nMARKET_HISTORY: {hist_time_to_complete}")
-    print(f"TOTAL TIME TO COMPLETE: {total_time}")
-    print("market update complete")
+    #
+    # # save files
+    # if csv_save_mode:
+    #     print("-----------saving files and exiting----------------")
+    #
+    #     save_to_csv(market_orders, orders_filename)
+    #     # reorder history columns
+    #     new_columns = ['date', 'type_id', 'highest', 'lowest', 'average', 'order_count', 'volume']
+    #     historical_df = historical_df[new_columns]
+    #     historical_df.to_csv(history_filename, index=False)
+    #     final_data.to_csv(market_stats_filename, index=False)
+    #
+    #     #save a copy of market stats to update spreadsheet consistently named
+    #     src_folder = r"output"
+    #     latest_folder = os.path.join(src_folder, "latest")
+    #     archive_folder = os.path.join(src_folder, "archive")
+    #     #cleanup files. "Full cleanup true" moves old files from output to archive.
+    #     rename_move_and_archive_csv(src_folder, latest_folder, archive_folder, True)
+    #
+    #     print("saving vale_jita data")
+    #     vale_jita.to_csv('output/latest/vale_jita.csv', index=False)
+    # # Completed stats
+    # finish_time = datetime.now()
+    # total_time = finish_time - start_time
+    #
+    # print("===================================================")
+    # print("ESI Request Completed Successfully.")
+    # print(f"Data for {len(final_data)} items retrieved.")
+    # print("=====================================================")
+    # print(
+    #     f"Time to complete:\nMARKET ORDERS: {Mkt_time_to_complete}, avg: {Avg_market_response_time}\nMARKET_HISTORY: {hist_time_to_complete}")
+    # print(f"TOTAL TIME TO COMPLETE: {total_time}")
+    # print("market update complete")
