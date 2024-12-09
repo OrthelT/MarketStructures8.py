@@ -1,8 +1,7 @@
-import json
 import os
+
 import requests
 import time
-import csv
 
 import pandas as pd
 from requests import ReadTimeout
@@ -12,6 +11,8 @@ from ESI_OAUTH_FLOW import get_token
 from file_cleanup import rename_move_and_archive_csv
 from get_jita_prices import get_jita_prices
 from sql_handler import process_esi_market_order
+import pan_db_handler as dbhandler
+from Doctrine_check import update_doctrines
 
 # LICENSE
 # This program is free software: you can redistribute it and/or modify it under the terms of the
@@ -47,133 +48,10 @@ market_stats_filename = f"output/valemarketstats_{datetime.now().strftime('%Y-%m
 merged_sell_filename = f"output/valemergedsell_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.csv"
 master_history_filename = "data/masterhistory/valemarkethistory_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.csv"
 
-def configuration_mode():
-    config_choice = input("run in configuration mode? (y/n):")
-    if config_choice == 'y':
-        test_mode, csv_save_mode = debug_mode()
-        return test_mode, csv_save_mode
-    else:
-        return False, True
-
-def debug_mode():
-    test_choice = input("run in testing mode? This will use abbreviated ESI calls for quick debugging (y/n):")
-    if test_choice == 'y':
-        test_mode = True  # uses abbreviated ESI calls for debugging
-        csv_save_mode = input("save output to CSV? (y/n):")
-        if csv_save_mode == 'y':
-            csv_save_mode = True
-        else:
-            csv_save_mode = False
-    else:
-        test_mode = False
-        csv_save_mode = True
-
-    return test_mode, csv_save_mode
-#
-
 #===============================================
 # Functions: Fetch Market Structure Orders
 #-----------------------------------------------
-def fetch_market_orders(test_mode):
-
-    #initiates the oath2 flow
-    token = get_token(SCOPE)
-
-    headers = {
-        'Authorization': f'Bearer {token["access_token"]}',
-        'Content-Type': 'application/json',
-    }
-
-    page = 1
-    max_pages = 1
-    tries: int = 0
-    total_tries = 0
-    error_count: int = 0
-    total_pages = 0
-
-    all_orders = []
-    errorlog = {}
-
-    while page <= max_pages:
-        response = requests.get(MARKET_STRUCTURE_URL + str(page), headers=headers)
-        print(f"Fetching page {page}, status code: {response.status_code}")  # Track status
-
-        if 'X-Pages' in response.headers:
-            max_pages = int(response.headers['X-Pages'])
-        elif response.status_code == 200:
-            max_pages = 1
-
-        #The test mode booleon sets a limited number of pages for debugging.
-        if test_mode:
-            max_pages = 3
-
-        #make sure we don't hit the error limit and get our IP banned
-        errorsleft = int(response.headers.get('X-ESI-Error-Limit-Remain', 0))
-        errorreset = int(response.headers.get('X-ESI-Error-Limit-Reset', 0))
-
-        if errorsleft == 0:
-            break
-        elif errorsleft < 10:
-            print(f'WARNING: Errors remaining: {errorsleft}. Error limit reset: {errorreset} seconds.')
-
-        #some error handling to gently keep prodding the ESI until we gat all the data
-        if response.status_code != 200:
-            error_code = response.status_code
-            error_info = response.json()
-            error = error_info['error']
-            print(
-                f"Error fetching data from page {page}. status code: {error_code} ({error}. tries: {tries} Retrying in 3 seconds...")
-            error_count += 1
-            #error logging
-            if error_code not in errorlog:
-                errorlog[error_code] = []  # Initialize the list if it doesn't exist
-            errorlog[error_code].append(page)
-            # try again a maximum of 5 times
-            if tries < 5:
-                tries += 1
-                time.sleep(3)
-                continue
-            else:
-                print(f'Reached the 5th try and giving up on page {page}.')
-                break
-        total_tries += tries
-        tries = 0
-
-        try:
-            orders = response.json()
-        except ValueError:
-            print(f"Error decoding JSON response from page {page}. Skipping to next page.")
-            continue
-
-        if not orders:
-            break
-
-        all_orders.extend(orders)
-
-        print(f"Orders fetched from page {page}/{max_pages}: {len(orders)}. Total Orders fetched: {len(all_orders)}.")
-
-        total_pages += 1
-        page += 1
-
-        print('-------------------------')
-        print(f"Now fetching page {page}...")
-        time.sleep(.5)
-
-    print(f"Retrieval complete. Fetched {total_pages}. Total orders: {len(all_orders)}")
-    print(f"Received {error_count} errors.")
-    print(f"{total_tries} total tries.")
-
-    save_errors = input("save error log? y/n")
-    if save_errors == 'y':
-        print("saving error log to csv...")
-        save_error_log_to_csv(errorlog, errorlog_filename)
-    else:
-        print("not saving error log.")
-
-    print("Returning all orders....")
-    return all_orders
-
-def fetch_market_orders_standard():
+def fetch_market_orders():
     # initiates the oath2 flow
     token = get_token(SCOPE)
     print('ESI Scope Authorized. Requesting data.')
@@ -233,26 +111,25 @@ def fetch_market_orders_standard():
                 print(f'Reached the 5th try and giving up on page {page}.')
                 failed_pages.append([page, error_code, error])
                 failed_pages_count += 1
-                break
-
-        total_tries += tries
-        tries = 0
-
-        try:
-            orders = response.json()
-        except ValueError:
-            print(f"Error decoding JSON response from page {page}. Skipping to next page.")
-            failed_pages.append([page, 'ValueError', 'ValueError'])
-            failed_pages_count += 1
-            continue
+                page += 1
+                tries = 0
+                continue
+        else:
+            tries = 0
+            total_pages += 1
+            try:
+                orders = response.json()
+            except ValueError:
+                print(f"Error decoding JSON response from page {page}. Skipping to next page.")
+                failed_pages.append([page, 'ValueError', 'ValueError'])
+                failed_pages_count += 1
+                continue
+        page += 1
 
         if not orders:
             break
 
         all_orders.extend(orders)
-
-        total_pages += 1
-        page += 1
 
     print('-----------------------------------------------')
     print('Market Orders Complete')
@@ -265,58 +142,11 @@ def fetch_market_orders_standard():
         print(f"The following pages failed: {failed_pages}")
         print(f"{failed_pages_count} pages failed.")
     else:
-        print(f"All pages fetched successfully. After {total_tries} total tries.")
+        print(f"All pages fetched successfully.")
     print("Returning all orders....")
     print('-----------------------------------------------')
     print('================================================')
     return all_orders
-
-# Save the CSV files
-# noinspection PyTypeChecker
-def save_to_csv(orders, filename):
-    fields = ['type_id', 'order_id', 'price', 'volume_remain', 'volume_total', 'is_buy_order', 'issued', 'range']
-
-    with open(filename, mode='w', newline='') as file:
-        writer = csv.DictWriter(file, fieldnames=fields)
-        writer.writeheader()
-        for order in orders:
-            writer.writerow({
-                'order_id': order.get('order_id'),
-                'price': order.get('price'),
-                'volume_remain': order.get('volume_remain'),
-                'volume_total': order.get('volume_total'),
-                'is_buy_order': order.get('is_buy_order'),
-                'issued': order.get('issued'),
-                'type_id': order.get('type_id'),
-                'range': order.get('range')
-            })
-    print(f"Market orders saved to {filename}")
-    # note some IDEs will flag the variable 'file' as an error.
-    # This is because DictWriter expects a str, but got a TextIO instead.
-    # TextIO does support string writing, so this is not actually an issue.
-
-def save_error_log_to_csv(errorlog, filename=None):
-
-    with open(filename, mode='w', newline='') as file:
-        writer = csv.writer(file)
-
-        # Write the header
-        writer.writerow(['Error Code', 'Pages'])
-
-        # Write each error code and the pages it occurred on
-        for error_code, pages in errorlog.items():
-            pages_str = ', '.join(map(str, pages))  # Convert list of pages to a comma-separated string
-            writer.writerow([error_code, pages_str])
-    print(f"Error log saved to {filename}")
-
-# Get the type ids to use for market history
-def get_type_ids(datafile):
-    watchlist = pd.read_csv(datafile,
-                            usecols=[0],
-                            names=['type_id'], skiprows=1
-                            )
-    type_ids = watchlist['type_id'].tolist()
-    return type_ids
 
 # update market history
 def fetch_market_history(type_id_list: list[int]) -> list[dict[str, int | str | float]]:
@@ -340,6 +170,7 @@ def fetch_market_history(type_id_list: list[int]) -> list[dict[str, int | str | 
     for type_id in range(len(type_id_list)):
         while page <= max_pages:
             item = type_id_list[type_id]
+            print(f'\ritems retrieved: {successful_returns}/{len(type_id_list)}', end="")
 
             try:
                 response = requests.get(market_history_url + str(item), headers=headers, timeout=timeout)
@@ -359,6 +190,7 @@ def fetch_market_history(type_id_list: list[int]) -> list[dict[str, int | str | 
                         continue
                     elif tries == 5:
                         print(f'Unable to retrieve any data for {item}. Moving on to the next...')
+                        page = 1
                         break
 
                 data = response.json()
@@ -367,14 +199,14 @@ def fetch_market_history(type_id_list: list[int]) -> list[dict[str, int | str | 
                     # Append the type_id to each item in the response
                     for entry in data:
                         entry['type_id'] = item  # Add type_id to each record
-
                     all_history.extend(data)
                 else:
                     print(f"Empty response for type_id {item}. Skipping.")
 
-                tries = 0
                 successful_returns += 1
+                tries = 0
                 max_pages = 1
+
 
             except ReadTimeout:
                 print(f"Request timed out for page {page}, item {item}. Retrying...")
@@ -382,10 +214,11 @@ def fetch_market_history(type_id_list: list[int]) -> list[dict[str, int | str | 
                     tries += 1
                     time.sleep(3)  # Wait before retrying
                     continue
-            print(f'\ritems retrieved: {successful_returns}', end="")
+
 
         page = 1
         max_pages = 1
+
     print('HISTORY COMPLETE')
     print('----------------------')
     print(f'Items found: {successful_returns}')
@@ -396,12 +229,10 @@ def fetch_market_history(type_id_list: list[int]) -> list[dict[str, int | str | 
 # ===============================================
 # Functions: Process Market Stats
 #-----------------------------------------------
-def filterorders(ids, list_orders):
-    filtered_orders = list_orders[list_orders['type_id'].isin(ids)]
-    return filtered_orders
-
-def aggregate_sell_orders(orders_data):
-    sell_orders = orders_data[orders_data['is_buy_order'] == False]
+def aggregate_sell_orders(market_orders_json: any, ids: list[int]) -> pd.DataFrame:
+    orders = pd.DataFrame(market_orders_json)
+    filtered_orders = orders[orders['type_id'].isin(ids)]
+    sell_orders = filtered_orders[filtered_orders['is_buy_order'] == False]
 
     grouped_df = sell_orders.groupby('type_id')['volume_remain'].sum().reset_index()
     grouped_df.columns = ['type_id', 'total_volume_remain']
@@ -417,11 +248,13 @@ def aggregate_sell_orders(orders_data):
 
     return merged_df
 
-
 def merge_market_stats(merged_orders, history_data):
     grouped_historical_df = history_merge(history_data)
     merged_data = pd.merge(merged_orders, grouped_historical_df, on='type_id', how='left')
-    final_df = pd.merge(merged_data, watchlist, on='type_id', how='left')
+
+    watchlist_names = watchlist.copy()
+
+    final_df = pd.merge(merged_data, watchlist_names, on='type_id', how='left')
     return final_df
 
 def history_merge(history_data):
@@ -437,71 +270,69 @@ def history_merge(history_data):
 
     return grouped_historical_df
 
-# ===============================================
-# MAIN PROGRAM
-# -----------------------------------------------
-# <ain function where everything gets executed.
 
 if __name__ == '__main__':
-
-    # hit the stopwatch to see how long it takes
+    # ===============================================
+    # MAIN PROGRAM
+    # -----------------------------------------------
+    # Main function where everything gets executed.
     start_time = datetime.now()
-    print(start_time)
+    # retrieve current type_ids from database
+    print('reading watchlist')
+    watchlist = dbhandler.read_watchlist()
+    type_ids = watchlist.typeID.tolist()
 
-    # pull market orders logging start time and checking for test mode
-    print("starting data pull...market orders")
+    print(f'retrieved {len(type_ids)} type_ids')
 
-    # Configure to run in an abbreviated test mode....
-    #
-    # idslocation = 'data/type_ids2.csv.'
-    # market_orders = fetch_market_orders_standard()
-    #
-    idslocation = 'data/type_ids.csv.'
-    market_orders = fetch_market_orders_standard()
+    print('------------------')
+    print('MARKET ORDERS')
+    print('-----------------')
+    # pull market orders
+    print("starting update...market orders")
+    market_orders = fetch_market_orders()
 
-    Mkt_time_to_complete = datetime.now() - start_time
-    Avg_market_response_time = (Mkt_time_to_complete.microseconds / len(market_orders)) / 1000
     print(
-        f'done. Time to complete market orders: {Mkt_time_to_complete}, avg market response time: {Avg_market_response_time}ms')
+        f'done. successfully retrieved {len(market_orders)}. connecting to database...')
 
-    print('connecting to database...')
-    db_status = process_esi_market_order(market_orders)
-    print(db_status)
+    # save to database
+    df_status = process_esi_market_order(market_orders, False)
+    print(df_status)
 
-    # code for retrieving type ids
-    type_idsCSV = pd.read_csv(idslocation)
-    type_ids = type_idsCSV['type_ids'].tolist()
-    expanded_type_ids = 'data/inv_types_expanded.csv'
-    watchlist = pd.read_csv('data/watchlist.csv')
+    print('------------------')
+    print('MARKET HISTORY')
+    print('------------------')
+
 
     # update history data
     print("updating history data")
-    history_start = datetime.now()
     raw_history = fetch_market_history(type_ids)
+    print('connecting to database and updating data')
 
-    print('connecting to database')
+    # #save to database
     df_status = process_esi_market_order(raw_history, True)
     print(df_status)
+    print('updating doctrine tracking')
+    doct_df = update_doctrines()
+    print(doct_df.head())
 
     historical_df = pd.DataFrame(raw_history)
+    print(f"history data complete. {len(historical_df)} records retrieved.")
 
-    hist_time_to_complete = datetime.now() - history_start
-    print(f"history data complete: {hist_time_to_complete}")
+    print('------------------')
+    print('PROCESSING ORDERS')
+    print('-----------------')
+    # processing data
+    watchlist.rename(columns={'typeID': 'type_id'}, inplace=True)
 
-    # process data
-    orders = pd.DataFrame(market_orders)
-
-    new_filtered_orders = filterorders(type_ids, orders)
-    merged_sell_orders = aggregate_sell_orders(new_filtered_orders)
-    merge_market_stats(merged_sell_orders, historical_df)
-
+    print('aggregating sell orders')
+    merged_sell_orders = aggregate_sell_orders(market_orders, type_ids)
+    print('merging historical data')
     final_data = merge_market_stats(merged_sell_orders, historical_df)
+    print('getting jita prices')
     vale_jita = get_jita_prices(final_data)
 
     # save files
     print("-----------saving files and exiting----------------")
-
-    save_to_csv(market_orders, orders_filename)
     # reorder history columns
     new_columns = ['date', 'type_id', 'highest', 'lowest', 'average', 'order_count', 'volume']
     historical_df = historical_df[new_columns]
@@ -524,8 +355,6 @@ if __name__ == '__main__':
     print("===================================================")
     print("ESI Request Completed Successfully.")
     print(f"Data for {len(final_data)} items retrieved.")
+    print(f"Total time: {total_time}")
     print("=====================================================")
-    print(
-        f"Time to complete:\nMARKET ORDERS: {Mkt_time_to_complete}, avg: {Avg_market_response_time}\nMARKET_HISTORY: {hist_time_to_complete}")
-    print(f"TOTAL TIME TO COMPLETE: {total_time}")
     print("market update complete")
