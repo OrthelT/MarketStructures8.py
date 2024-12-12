@@ -1,37 +1,45 @@
-
 import polars as pl
 
 from datetime import datetime, timezone
 from typing import Optional
 
-from sqlalchemy import create_engine, String, Integer, Float, DateTime, Boolean, \
-    PrimaryKeyConstraint, text
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy import (
+    create_engine,
+    String,
+    Integer,
+    Float,
+    DateTime,
+    Boolean,
+    PrimaryKeyConstraint,
+    text,
+)
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, foreign
 
-sql_file = 'market_orders.sqlite'
+sql_file = "market_orders.sqlite"
 
 market_columns = [
-    'type_id',
-    'volume_remain',
-    'price',
-    'issued',
-    'duration',
-    'order_id',
-    'is_buy_order'
-
+    "type_id",
+    "volume_remain",
+    "price",
+    "issued",
+    "duration",
+    "order_id",
+    "is_buy_order",
 ]
 history_columns = [
-    'date',
-    'type_id',
-    'average',
-    'highest',
-    'lowest',
-    'order_count',
-    'volume']
+    "date",
+    "type_id",
+    "average",
+    "highest",
+    "lowest",
+    "order_count",
+    "volume",
+]
 
 
 class Base(DeclarativeBase):
     pass
+
 
 class MarketOrder(Base):
     __tablename__ = "market_order"
@@ -46,6 +54,7 @@ class MarketOrder(Base):
     is_buy_order: Mapped[bool] = mapped_column(Boolean)
     timestamp: Mapped[datetime] = mapped_column(DateTime)
 
+
 class MarketHistory(Base):
     __tablename__ = "market_history"
     date: Mapped[datetime] = mapped_column(DateTime)
@@ -59,10 +68,35 @@ class MarketHistory(Base):
     timestamp: Mapped[datetime] = mapped_column(DateTime)
 
     # Add composite primary key
-    __table_args__ = (
-        PrimaryKeyConstraint('date', 'type_id'),
-    )
+    __table_args__ = (PrimaryKeyConstraint("date", "type_id"),)
 
+
+class Doctrines(Base):
+    __tablename__ = "Doctrines"
+    doctrine_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    doctrine_name: Mapped[str] = mapped_column(String(100))
+    doctrine_version: Mapped[str] = mapped_column(String(100))
+
+
+class Doctrine_Fits(Base):
+    __tablename__ = "Doctrine_Fittings"
+    doctrine_id: Mapped[int] = mapped_column(Integer)
+    doctrine_name: Mapped[str] = mapped_column(String(100))
+    doctrine_version: Mapped[str] = mapped_column(String(100))
+    fitting_name: Mapped[str] = mapped_column(String(100), primary_key=True)
+    ship_class: Mapped[str] = mapped_column(String(50))
+    ship_group: Mapped[str] = mapped_column(String(50))
+    ship_group_id: Mapped[str] = mapped_column(String(100))
+
+
+class Fitting_Items(Base):
+    __tablename__ = "Fittings"
+    type_id: Mapped[str] = mapped_column(String(10), primary_key=True)
+    fitting_name: Mapped[str] = mapped_column(String(100))
+    type_name: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    qty_required: Mapped[int] = mapped_column(Integer)
+    fitting_version: Mapped[int] = mapped_column(Integer)
+    is_hull: Mapped[bool] = mapped_column(Boolean)
 
 class CurrentOrders(Base):
     __tablename__ = "current_orders"
@@ -76,22 +110,44 @@ class CurrentOrders(Base):
     is_buy_order: Mapped[bool] = mapped_column(Boolean)
     timestamp: Mapped[datetime] = mapped_column(DateTime)
 
-def process_dataframe(df: pl.DataFrame, columns: list, date_column: str = None) -> pl.DataFrame:
+
+class ShipMetadata:
+    ALLOWED_SHIP_ROLES = {"dps", "logi", "links", "tackle", "ewar"}
+
+    def __init__(self, ship_role):
+        self.ship_role = ship_role
+
+    @property
+    def ship_role(self):
+        return self._ship_role
+
+    @ship_role.setter
+    def ship_role(self, value):
+        if value not in self.ALLOWED_SHIP_ROLES:
+            raise ValueError(
+                f"ValueError: Ship roles can only include the following: {', '.join(self.ALLOWED_SHIP_ROLES)}"
+            )
+        self._ship_role = value
+
+
+def process_dataframe(
+        df: pl.DataFrame, columns: list, date_column: str = None
+) -> pl.DataFrame:
     """Process the dataframe by selecting columns and converting dates."""
     # Select only the specified columns
     df = df.select(columns)
     if date_column is None:
-        if 'date' in df.columns:
-            date_column = 'date'
-        elif 'issued' in df.columns:
-            date_column = 'issued'
+        if "date" in df.columns:
+            date_column = "date"
+        elif "issued" in df.columns:
+            date_column = "issued"
         else:
             date_column = None
     # Convert  date strings to datetime objects
     if date_column:
-        df = df.with_columns([
-            pl.col(date_column).str.strptime(pl.Datetime).alias(date_column)
-        ])
+        df = df.with_columns(
+            [pl.col(date_column).str.strptime(pl.Datetime).alias(date_column)]
+        )
     df = insert_timestamp(df)
     return df
 
@@ -109,7 +165,9 @@ def insert_type_names(df: pl.DataFrame) -> pl.DataFrame:
     type_dict = dict(type_mappings)
 
     df_named = df.with_columns(
-        pl.col('type_id').map_elements(lambda x: type_dict.get(x), return_dtype=pl.String).alias('type_name')
+        pl.col("type_id")
+        .map_elements(lambda x: type_dict.get(x), return_dtype=pl.String)
+        .alias("type_name")
     )
     return df_named
 
@@ -117,9 +175,10 @@ def insert_type_names(df: pl.DataFrame) -> pl.DataFrame:
 def insert_timestamp(df: pl.DataFrame) -> pl.DataFrame:
     ts = datetime.now(timezone.utc)
     df = df.with_columns(
-        pl.lit(ts).alias('timestamp'),
+        pl.lit(ts).alias("timestamp"),
     )
     return df
+
 
 def initialize_database(engine, base):
     """Create all database tables."""
@@ -150,13 +209,16 @@ def update_current_orders(df: pl.DataFrame) -> str:
         except Exception as e:
             print(f"Error clearing table: {str(e)}")
             raise
-        print('table cleared')
+        print("table cleared")
 
         try:
             for i in range(0, len(records), batch_size):
-                batch = records[i:i + batch_size]
+                batch = records[i: i + batch_size]
                 conn.execute(text(current_statement), batch)
-                print(f"\rProcessed records {i} to {min(i + batch_size, len(records))}", end="")
+                print(
+                    f"\rProcessed records {i} to {min(i + batch_size, len(records))}",
+                    end="",
+                )
             status = "Data loading completed successfully!"
         except Exception as e:
             print(f"Error inserting data: {str(e)}")
@@ -171,7 +233,7 @@ def process_esi_market_order(data: list, is_history: Boolean = False) -> str:
 
     if is_history:
         columns = history_columns
-        order_class = 'history'
+        order_class = "history"
         # update history data
         stmt = """
         INSERT INTO market_history 
@@ -202,7 +264,7 @@ def process_esi_market_order(data: list, is_history: Boolean = False) -> str:
           );"""
 
     else:
-        #update market orders
+        # update market orders
         columns = market_columns
         stmt = """
         INSERT INTO market_order 
@@ -232,7 +294,7 @@ def process_esi_market_order(data: list, is_history: Boolean = False) -> str:
         
         );"""
 
-        order_class = 'market'
+        order_class = "market"
 
     df = pl.DataFrame(data)
     df_processed = process_dataframe(df, columns)
@@ -245,9 +307,12 @@ def process_esi_market_order(data: list, is_history: Boolean = False) -> str:
     with engine.begin() as conn:
         try:
             for i in range(0, len(records), batch_size):
-                batch = records[i:i + batch_size]
+                batch = records[i: i + batch_size]
                 conn.execute(text(stmt), batch)
-                print(f"\rProcessed records {i} to {min(i + batch_size, len(records))}", end="")
+                print(
+                    f"\rProcessed records {i} to {min(i + batch_size, len(records))}",
+                    end="",
+                )
             status = "Data loading completed successfully!"
         except Exception as e:
             print(f"Error inserting data: {str(e)}")
@@ -258,7 +323,7 @@ def process_esi_market_order(data: list, is_history: Boolean = False) -> str:
         except Exception as e:
             print(f"Error filling in type names: {str(e)}")
 
-    if order_class == 'market':
+    if order_class == "market":
         try:
             status = update_current_orders(df_processed)
         except Exception as e:
@@ -268,5 +333,5 @@ def process_esi_market_order(data: list, is_history: Boolean = False) -> str:
     return status
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     pass

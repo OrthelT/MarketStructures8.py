@@ -1,11 +1,13 @@
 import sqlite3
 
 import pandas as pd
-import os
-import sqlite3 as sq
+import time
+
+from pandas import notnull, isnull, notna
+from pandas.core.computation.ops import isnumeric
 
 
-def initiate_connection(database: str = 'market_orders.sqlite'):
+def initiate_connection(database: str = "market_orders.sqlite"):
     conn = sqlite3.connect(database)
     return conn
 
@@ -13,13 +15,13 @@ def initiate_connection(database: str = 'market_orders.sqlite'):
 def write_db(data):
     conn = initiate_connection()
     df = pd.DataFrame(data)
-    df.to_sql('orders', conn, if_exists='append', index=False)
+    df.to_sql("orders", conn, if_exists="append", index=False)
     conn.close()
 
 
 def read_market_orders():
-    conn = sqlite3.connect('market_orders.sqlite')
-    orders = pd.read_sql('SELECT * FROM current_orders', conn)
+    conn = sqlite3.connect("market_orders.sqlite")
+    orders = pd.read_sql("SELECT * FROM current_orders", conn)
     conn.close()
     return orders
 
@@ -30,11 +32,20 @@ def dict_factory(cursor, row):
 
 
 def read_watchlist():
-    conn = initiate_connection(database=r'../ESI_Utilities/SDE/SDE sqlite-latest.sqlite')
-    df = pd.read_sql('SELECT * FROM watchlist', conn)
+    conn = initiate_connection(
+        database=r"../ESI_Utilities/SDE/SDE sqlite-latest.sqlite"
+    )
+    df = pd.read_sql("SELECT * FROM watchlist", conn)
     conn.close()
     return df
 
 
-if __name__ == '__main__':
-    print('lll')
+# def read_doctrine():
+#     conn = initiate_connection(
+#         database=r"../ESI_Utilities/SDE/SDE sqlite-latest.sqlite"
+#     )
+#     df = pd.read_sql("SELECT * FROM doctrines", conn)
+
+
+if __name__ == "__main__":
+    pass
