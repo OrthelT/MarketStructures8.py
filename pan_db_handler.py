@@ -1,4 +1,5 @@
 import sqlite3
+from contextlib import closing
 
 import pandas as pd
 import time
@@ -21,8 +22,10 @@ def write_db(data):
 
 def read_market_orders():
     conn = sqlite3.connect("market_orders.sqlite")
+    print(f'connection established: {conn} by pan_db_handler')
     orders = pd.read_sql("SELECT * FROM current_orders", conn)
     conn.close()
+    print(f'connection closed: {conn}...returning orders from pan_db_handler')
     return orders
 
 

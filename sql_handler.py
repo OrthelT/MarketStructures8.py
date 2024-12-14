@@ -71,13 +71,6 @@ class MarketHistory(Base):
     __table_args__ = (PrimaryKeyConstraint("date", "type_id"),)
 
 
-class Doctrines(Base):
-    __tablename__ = "Doctrines"
-    doctrine_id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    doctrine_name: Mapped[str] = mapped_column(String(100))
-    doctrine_version: Mapped[str] = mapped_column(String(100))
-
-
 class Doctrine_Fits(Base):
     __tablename__ = "Doctrine_Fittings"
     doctrine_id: Mapped[int] = mapped_column(Integer)
@@ -110,26 +103,6 @@ class CurrentOrders(Base):
     is_buy_order: Mapped[bool] = mapped_column(Boolean)
     timestamp: Mapped[datetime] = mapped_column(DateTime)
 
-
-class ShipMetadata:
-    ALLOWED_SHIP_ROLES = {"dps", "logi", "links", "tackle", "ewar"}
-
-    def __init__(self, ship_role):
-        self.ship_role = ship_role
-
-    @property
-    def ship_role(self):
-        return self._ship_role
-
-    @ship_role.setter
-    def ship_role(self, value):
-        if value not in self.ALLOWED_SHIP_ROLES:
-            raise ValueError(
-                f"ValueError: Ship roles can only include the following: {', '.join(self.ALLOWED_SHIP_ROLES)}"
-            )
-        self._ship_role = value
-
-
 def process_dataframe(
         df: pl.DataFrame, columns: list, date_column: str = None
 ) -> pl.DataFrame:
@@ -151,7 +124,6 @@ def process_dataframe(
     df = insert_timestamp(df)
     return df
 
-
 def insert_type_names(df: pl.DataFrame) -> pl.DataFrame:
     engine = create_engine(f"sqlite:///{sql_file}", echo=False)
 
@@ -171,7 +143,6 @@ def insert_type_names(df: pl.DataFrame) -> pl.DataFrame:
     )
     return df_named
 
-
 def insert_timestamp(df: pl.DataFrame) -> pl.DataFrame:
     ts = datetime.now(timezone.utc)
     df = df.with_columns(
@@ -179,11 +150,9 @@ def insert_timestamp(df: pl.DataFrame) -> pl.DataFrame:
     )
     return df
 
-
 def initialize_database(engine, base):
     """Create all database tables."""
     base.metadata.create_all(engine)
-
 
 def update_current_orders(df: pl.DataFrame) -> str:
     df_processed = insert_type_names(df)
