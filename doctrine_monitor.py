@@ -1,17 +1,8 @@
-from contextlib import closing
-from itertools import groupby
-from typing import final
 
 import pandas as pd
 import sqlalchemy
-from fontTools.varLib.instancer.names import pruningUnusedNames
-
-from Doctrine_check import aggregate_orders
-from pan_db_handler import read_market_orders
-import mysql.connector
-import datetime
-
-from click.testing import Result
+from db_handler import read_market_orders
+from logging_tool import configure_logging
 
 
 def get_doctrine_fits(db_name: str = 'wc_fitting'):
@@ -63,8 +54,10 @@ def get_doctrine_fits(db_name: str = 'wc_fitting'):
 def get_fit_items(df, fit_id: int):
     cols = ['id', 'name', 'ship_type_id', 'type_name']
     db_name = 'wc_fitting'
+    logger.info(f'connecting to {db_name}')
     mysql_connection = f"mysql+mysqlconnector://Orthel:Dawson007!27608@localhost:3306/{db_name}"
     engine = sqlalchemy.create_engine(mysql_connection)
+    logger.info(f'MySql db connection established')
     filtered_df = df[df['id'] == fit_id]
     df = filtered_df.rename({'id': 'fit_id', 'ship_type_id': 'type_id', 'name': 'doctrine_name'}, axis="columns")
 
@@ -97,7 +90,6 @@ def get_fit_items(df, fit_id: int):
     fit_items = pd.concat([df, df4])
     return fit_items
 
-
 def get_market_stats(doctrine_df: pd.DataFrame, orders: pd.DataFrame, target: int = 20) -> pd.DataFrame:
     # Convert orders type_id to integer
     orders['type_id'] = pd.to_numeric(orders['type_id'])
@@ -112,7 +104,6 @@ def get_market_stats(doctrine_df: pd.DataFrame, orders: pd.DataFrame, target: in
     final_orders = aggregate_df.drop(columns=['order_id', 'issued', 'duration', 'is_buy_order', 'timestamp'])
     df = doctrine_df.merge(final_orders, on='type_id', how='left')
     return df
-
 
 def get_doctrine_status(target: int = 20) -> pd.DataFrame:
     target_df = pd.DataFrame()
@@ -161,23 +152,53 @@ def get_doctrine_status(target: int = 20) -> pd.DataFrame:
     return short_df, target_df, summary_df
 
 
-if __name__ == "__main__":
-    print('checking doctrine market status')
-    print('-------------------------------------')
-    target = 20
-    df_short, df_target, df_summary = get_doctrine_status(20)
-    types = df_target['type_id'].unique().tolist()
+def read_doctrine_watchlist(db_name: str = 'wc_fitting') -> list:
+    logger.info(f'connecting to {db_name}')
+    mysql_connection = f"mysql+mysqlconnector://Orthel:Dawson007!27608@localhost:3306/{db_name}"
+    engine = sqlalchemy.create_engine(mysql_connection)
+    conn = engine.connect()
+    logger.info(f'MySql db connection established')
 
-    print('-------------------------------')
-    print('   doctrine status updated')
-    print('-------------------------------')
-    fittings = len(df_target['fit_id'].unique().tolist())
-    print(f'total fittings: {fittings}')
-    print(f'total items: {len(types)}')
-    print(f'items with less than {target} on market: {len(df_short)}')
-    print('writing market data to csv files...')
-    df_target.to_csv('output/latest/doctrine_status.csv', index=False)
-    df_short.to_csv('output/latest/short_doctrines.csv', index=False)
-    df_summary.to_csv('output/latest/summary.csv', index=False)
-    print('complete')
-    print('-------------------------------')
+    query = """
+    SELECT DISTINCT t.type_id,ft.type_name
+    FROM watch_doctrines as w
+    JOIN fittings_doctrine_fittings f on w.id = f.doctrine_id
+    JOIN fittings_fittingitem t on f.fitting_id = t.fit_id
+    JOIN fittings_type ft on t.type_id = ft.type_id
+    """
+
+    logger.info(f'executing {query} on {engine}')
+    df = pd.read_sql_query(query, conn)
+
+    print(f'{len(df)} doctrines retrieved')
+    print('closing db connection with engine.dispose()')
+    engine.dispose()
+    id_list = df['type_id'].tolist()
+    print(f'{len(id_list)} doctrines retrieved')
+    print(id_list[:10])
+    return id_list
+if __name__ == "__main__":
+    logger = configure_logging("doctrine_monitor", "logs/doctrines.log")
+    logger.info('starting')
+    doctrine_ids = read_doctrine_watchlist('wc_fitting')
+    print(len(doctrine_ids))
+
+    # print('checking doctrine market status')
+    # print('-------------------------------------')
+    # target = 20
+    # df_short, df_target, df_summary = get_doctrine_status(20)
+    # types = df_target['type_id'].unique().tolist()
+    #
+    # print('-------------------------------')
+    # print('   doctrine status updated')
+    # print('-------------------------------')
+    # fittings = len(df_target['fit_id'].unique().tolist())
+    # print(f'total fittings: {fittings}')
+    # print(f'total items: {len(types)}')
+    # print(f'items with less than {target} on market: {len(df_short)}')
+    # print('writing market data to csv files...')
+    # df_target.to_csv('output/latest/doctrine_status.csv', index=False)
+    # df_short.to_csv('output/latest/short_doctrines.csv', index=False)
+    # df_summary.to_csv('output/latest/summary.csv', index=False)
+    # print('complete')
+    # print('-------------------------------')

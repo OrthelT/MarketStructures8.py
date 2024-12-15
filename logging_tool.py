@@ -1,10 +1,12 @@
 import logging
 from logging.handlers import RotatingFileHandler
 
+from tornado.gen import Return
+
 
 def configure_logging(
         log_name: str = "report_log", log_file: str = "log_report.log"
-) -> None:
+) -> logging.Logger:
     # Create logger
     logger = logging.getLogger(log_name)
     logger.setLevel(logging.INFO)
@@ -28,3 +30,4 @@ def configure_logging(
         level=logging.INFO,
         format="%(asctime)s - %(levelname)s - %(message)s",
     )
+    return logger

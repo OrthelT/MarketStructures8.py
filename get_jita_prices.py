@@ -1,6 +1,5 @@
 import pandas as pd
 import requests
-import json
 
 # Tools to retrieve Jita prices using the Fuzzworks market API
 # Sample data to use for testing

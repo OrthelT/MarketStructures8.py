@@ -7,8 +7,8 @@ import pandas as pd
 import requests
 from requests import ReadTimeout
 
-import pan_db_handler as dbhandler
-from Doctrine_check import update_doctrines
+import db_handler as dbhandler
+from backupfolder.Doctrine_check import update_doctrines
 from ESI_OAUTH_FLOW import get_token
 from file_cleanup import rename_move_and_archive_csv
 from get_jita_prices import get_jita_prices

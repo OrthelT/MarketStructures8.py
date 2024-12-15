@@ -1,0 +1,75 @@
+﻿id,name,icon_url,description,created,last_updated
+30,SUBS - WC Tackle,https://images.evetech.net/types/22456/render?size=64,"WC Tackle
+A collection of tackle ships (both armour and shield), interceptors, interdictors, and probing ships that are used across multiple doctrines.
+
+Includes: 
+- Dictors: Sabres, Flycatchers and Probing Heretics;
+- Interceptors: Crow, Rest being Redesigned;
+- Misc tackle: (ram) Jaguar.
+
+2404 - Swapped Sabre Fit, Removed some old tackle fits that are no longer in use.",2022-02-21 22:01:22.975247,2024-04-09 23:11:01.829270
+33,SUBS - WC AHACs,https://images.evetech.net/types/12003/render?size=64,"WC AHACs: an Armour Heavy Armor Assault Cruiser doctrine.
+Using Zealots and Deimos for DPS; Guardians, Oneiroses, and Zarmazd for logi; and supported by Damnation (links), Proteus (scram), Devoter (bubbling), and a Loki.
+Special snowflakes (upon request from FC): Svipul anti-bomb support & Celestis e-war support.",2022-02-21 22:18:23.543540,2024-04-10 22:39:38.036154
+40,SUBS - WC Nightmare,https://images.evetech.net/types/17736/render?size=64,"WC Nightmare Doctrine comprised of:
+Nightmare (DPS); 
+Claymore & Nighthawks (Links); 
+Scimitar (Logi); 
+Loki (Webs);
+Hyena (Support)
+
+Updated as of May '24",2022-04-19 16:18:07.345275,2024-05-13 12:45:21.156135
+50,SUBS - WC-EN Retributions 2404,https://images.evetech.net/types/11393/render?size=64,"Close to Mid-Range Assault Frigates with Tackle options for Retributions. Ideal for situations where you need to individually spread tackle to pin down fleets, or need to project with decent DPS within 50km.
+
+https://wiki.winterco.org/en/pvp/doctrines/fleet_retributions",2022-11-08 20:19:27.357066,2024-04-09 23:09:30.456685
+51,SUBS - WCEN Uprising Harpy Fleet,https://images.evetech.net/types/11381/render?size=64,"Designed to fight between 30km - 100km - this nimble composition should be able to disengage whenever needed, but still provide a level of cover or support to fleets
+
+Includes: 
+
+2404 - Changed Sabre Fit",2022-11-08 20:26:06.792552,2024-07-01 09:08:25.936518
+52,SUBS - WC-EN AB Kikimora Fleet,https://images.evetech.net/types/49710/render?size=64,"Design for hunting & killing capitals, T1 supports are mwd
+
+2404 - Changed Sabre Fit",2022-11-08 20:33:09.358908,2024-07-01 10:22:06.532056
+60,SUBS - WCEN Uprising Tempest Fleet Issue,https://images.evetech.net/types/17732/render?size=64,"WC-EN TFI -- Uprising Tempest Fleet Issues.
+
+Includes: Tempest Fleet Issue (TFIs) (DPS); with Damnation (links); Huginns  and Bhaalgorns (webs/neuts); Guardians, Oneiroses or (sometimes) Rodivas for T2 logi and Exequrors for T1 logi; and Phoboses and Devoters for bubbles; 
+Additional special snowflakes (when asked): Svipul anti-bombers & Celestis e-war;",2022-11-08 20:54:51.039957,2024-04-09 23:09:44.494794
+62,SUBS - WC-EN Cyclone Fleet Issues,https://images.evetech.net/types/72811/render?size=64,"2401 WC-EN Cyclone Fleet Issues
+
+Includes: Cyclone Fleet Issues -- CFI -- (DPS); Basilisks and Scimitars (logi); Claymores (links);  Huginn, Hyenas, and Lachesises (e-war); Sabres, Flycatchers, Onyxes, and Broadswords (tackle); 
+
+2404 - 
+
+Changed Sabre Fit
+Changed Broadsword Fit
+Changed Onyx Fit
+
+2405 - added support loki",2023-07-13 20:38:58.063800,2024-06-06 20:08:58.024458
+71,SUBS - WC-EN Bombing Bombers,https://images.evetech.net/types/12038/render?size=64,"Fits for each of the stealth bombers, with roughly the same align time and module layout.
+
+Replace the t1 bomb launcher with a t2 bomb launcher if you can use it, as it is strictly better. Be aware that if you are asked to bring multiple bomb types, you will want to have three bombs loaded instead of four, so that you can swap bombs. If you have 4 bombs in your launcher, you will not be able to swap bombs without first firing one that you have loaded.
+
+Purifier / Hound are preferred over Nemesis / Manticore. If you can only fly a Nemesis or a Manticore, then go with those options.
+
+If you run into fitting issues, you can downgrade the microwarpdrive to a compact on the Nemesis and Manticore fits, as they are tight on fitting.",2024-03-21 23:37:04.976569,2024-06-14 20:24:10.512922
+74,SUBS - Newbro Friendly Ships,https://images.evetech.net/types/582/render?size=64,"A selection of ships that Newbros can pick from to contribute to the fleet with low SP
+
+E-War:
+Maulus
+Crucifier
+Griffin
+Vigil
+
+Tackle:
+Slasher
+Atron
+Condor
+Executioner",2024-07-01 09:55:02.836352,2024-07-01 10:19:04.943385
+75,SUBS - WC-EN Vulture/Ferox Navy Issue Fleet,https://images.evetech.net/types/22446/render?size=64,"2407 Vulture/FNI Fleet
+
+Includes: 
+DPS: Vultures > FNI
+Logi: Basilisk
+Links: Claymore
+Support: Loki, Broadsword, Onyx, Lachesis, Huginn, Svipul",2024-07-01 17:53:44.133862,2024-07-17 22:50:57.708656
+76,SUBS - WC-EN Exequror Navy,https://images.evetech.net/types/29344/render?size=64,,2024-07-03 07:35:37.581675,2024-07-04 07:10:54.669659
