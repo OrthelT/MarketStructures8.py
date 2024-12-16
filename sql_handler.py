@@ -1,8 +1,11 @@
-import polars as pl
+from idlelib.history import History
 
+import polars as pl
+import pandas as pd
 from datetime import datetime, timezone
 from typing import Optional
 
+from pyarrow import int64
 from sqlalchemy import (
     create_engine,
     String,
@@ -13,7 +16,7 @@ from sqlalchemy import (
     PrimaryKeyConstraint,
     text,
 )
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, foreign
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker, foreign
 
 sql_file = "market_orders.sqlite"
 
@@ -40,7 +43,6 @@ history_columns = [
 class Base(DeclarativeBase):
     pass
 
-
 class MarketOrder(Base):
     __tablename__ = "market_order"
 
@@ -53,7 +55,6 @@ class MarketOrder(Base):
     duration: Mapped[int] = mapped_column(Integer)
     is_buy_order: Mapped[bool] = mapped_column(Boolean)
     timestamp: Mapped[datetime] = mapped_column(DateTime)
-
 
 class MarketHistory(Base):
     __tablename__ = "market_history"
@@ -71,6 +72,20 @@ class MarketHistory(Base):
     __table_args__ = (PrimaryKeyConstraint("date", "type_id"),)
 
 
+class Market_Stats(Base):
+    __tablename__ = "Market_Stats"
+    type_id: Mapped[str] = mapped_column(String(10), primary_key=True)
+    total_volume_remain: Mapped[int] = mapped_column(Integer)
+    min_price: Mapped[float] = mapped_column(Float)
+    price_5th_percentile: Mapped[float] = mapped_column(Float)
+    avg_of_avg_price: Mapped[float] = mapped_column(Float)
+    avg_daily_volume: Mapped[float] = mapped_column(Float)
+    group_id: Mapped[str] = mapped_column(String(10))
+    type_name: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    group_name: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    category_id: Mapped[str] = mapped_column(String(10))
+    category_name: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+
 class Doctrine_Fits(Base):
     __tablename__ = "Doctrine_Fittings"
     doctrine_id: Mapped[int] = mapped_column(Integer)
@@ -80,7 +95,6 @@ class Doctrine_Fits(Base):
     ship_class: Mapped[str] = mapped_column(String(50))
     ship_group: Mapped[str] = mapped_column(String(50))
     ship_group_id: Mapped[str] = mapped_column(String(100))
-
 
 class Fitting_Items(Base):
     __tablename__ = "Fittings"
@@ -152,49 +166,8 @@ def insert_timestamp(df: pl.DataFrame) -> pl.DataFrame:
 
 def initialize_database(engine, base):
     """Create all database tables."""
-    base.metadata.create_all(engine)
-
-def update_current_orders(df: pl.DataFrame) -> str:
-    df_processed = insert_type_names(df)
-    records = df_processed.to_dicts()
-
-    engine = create_engine(f"sqlite:///{sql_file}", echo=False)
-    batch_size = 1000
-    status = "failed"
-    current_statement = """
-        INSERT INTO current_orders
-            (order_id, type_id, type_name, volume_remain, price, issued, duration, is_buy_order, timestamp)
-            VALUES
-            (:order_id, :type_id, :type_name, :volume_remain, :price, :issued, :duration, :is_buy_order, :timestamp);
-        """
-
-    clear_table = """
-        DELETE FROM current_orders;
-            """
-    with engine.begin() as conn:
-
-        try:
-            conn.execute(text(clear_table))
-        except Exception as e:
-            print(f"Error clearing table: {str(e)}")
-            raise
-        print("table cleared")
-
-        try:
-            for i in range(0, len(records), batch_size):
-                batch = records[i: i + batch_size]
-                conn.execute(text(current_statement), batch)
-                print(
-                    f"\rProcessed records {i} to {min(i + batch_size, len(records))}",
-                    end="",
-                )
-            status = "Data loading completed successfully!"
-        except Exception as e:
-            print(f"Error inserting data: {str(e)}")
-            raise
-
-    return status
-
+    # base.metadata.create_all(engine)
+    pass
 
 def process_esi_market_order(data: list, is_history: Boolean = False) -> str:
     engine = create_engine(f"sqlite:///{sql_file}", echo=False)
@@ -260,7 +233,7 @@ def process_esi_market_order(data: list, is_history: Boolean = False) -> str:
             SELECT 1
             FROM JoinedInvTypes as jt
             WHERE jt.typeID = market_order.type_id
-        
+
         );"""
 
         order_class = "market"
@@ -302,5 +275,95 @@ def process_esi_market_order(data: list, is_history: Boolean = False) -> str:
     return status
 
 
+def update_current_orders(df: pl.DataFrame) -> str:
+    df_processed = insert_type_names(df)
+    records = df_processed.to_dicts()
+
+    engine = create_engine(f"sqlite:///{sql_file}", echo=False)
+    batch_size = 1000
+    status = "failed"
+    current_statement = """
+        INSERT INTO current_orders
+            (order_id, type_id, type_name, volume_remain, price, issued, duration, is_buy_order, timestamp)
+            VALUES
+            (:order_id, :type_id, :type_name, :volume_remain, :price, :issued, :duration, :is_buy_order, :timestamp);
+        """
+
+    clear_table = """
+        DELETE FROM current_orders;
+            """
+    with engine.begin() as conn:
+
+        try:
+            conn.execute(text(clear_table))
+        except Exception as e:
+            print(f"Error clearing table: {str(e)}")
+            raise
+        print("table cleared")
+
+        try:
+            for i in range(0, len(records), batch_size):
+                batch = records[i: i + batch_size]
+                conn.execute(text(current_statement), batch)
+                print(
+                    f"\rProcessed records {i} to {min(i + batch_size, len(records))}",
+                    end="",
+                )
+            status = "Data loading completed successfully!"
+        except Exception as e:
+            print(f"Error inserting data: {str(e)}")
+            raise
+
+    return status
+
+
+def update_stats(df: pl.DataFrame) -> str:
+    df = df.fillna(0)
+
+    engine = create_engine(f"sqlite:///{sql_file}", echo=False)
+    Base.metadata.create_all(engine)
+    # Create a session factory
+    Session = sessionmaker(bind=engine)
+    session = Session()
+    # Let's assume your DataFrame is called 'df'
+    # This is the most efficient way to bulk insert the data
+    try:
+        # Convert DataFrame to a list of dictionaries
+        # Each dictionary represents one row with column names as keys
+        records = df.to_dict(orient='records')
+        # Create Market_Stats objects from the dictionaries
+        market_stats_objects = [Market_Stats(**record) for record in records]
+        # Bulk insert all records at once
+        session.bulk_save_objects(market_stats_objects)
+        session.commit()
+        status = "Data loading completed successfully!"
+    except Exception as e:
+        # If something goes wrong, roll back the session
+        session.rollback()
+        status = f"An error occurred: {e}"
+
+    finally:
+        # Always close the session when you're done
+        session.close()
+
+    return status
+
+
+def read_history(doys: int = 30) -> pd.DataFrame:
+    engine = create_engine(f"sqlite:///{sql_file}", echo=True)
+    # Create a session factory
+    session = engine.connect()
+    print(f'connection established: {session} by sql_handler.read_history()')
+    d = f"'-{doys} days'"
+
+    stmt = f"""
+    SELECT * FROM market_history
+    WHERE date >= date('now', {d})"""
+
+    historydf = pd.read_sql(stmt, session)
+    session.close()
+    print(f'connection closed: {session}...returning orders from market_history table.')
+    return historydf
+
 if __name__ == "__main__":
-    pass
+    engine = create_engine(f"sqlite:///{sql_file}", echo=False)

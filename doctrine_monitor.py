@@ -1,8 +1,12 @@
 
 import pandas as pd
 import sqlalchemy
+from sqlalchemy import exc
+
 from db_handler import read_market_orders
 from logging_tool import configure_logging
+
+logger = configure_logging()
 
 
 def get_doctrine_fits(db_name: str = 'wc_fitting'):
@@ -50,14 +54,11 @@ def get_doctrine_fits(db_name: str = 'wc_fitting'):
     engine.dispose()
     return df
 
-
 def get_fit_items(df, fit_id: int):
     cols = ['id', 'name', 'ship_type_id', 'type_name']
     db_name = 'wc_fitting'
-    logger.info(f'connecting to {db_name}')
     mysql_connection = f"mysql+mysqlconnector://Orthel:Dawson007!27608@localhost:3306/{db_name}"
     engine = sqlalchemy.create_engine(mysql_connection)
-    logger.info(f'MySql db connection established')
     filtered_df = df[df['id'] == fit_id]
     df = filtered_df.rename({'id': 'fit_id', 'ship_type_id': 'type_id', 'name': 'doctrine_name'}, axis="columns")
 
@@ -119,7 +120,6 @@ def get_doctrine_status(target: int = 20) -> pd.DataFrame:
 
     for id in fit_ids:
         fit_items = get_fit_items(fits_df, id)
-        print(f'\rgetting fit {c} of {len(fit_ids)}', end="")
         c += 1
         markets = get_market_stats(doctrine_df=fit_items, orders=orders, target=target)
         if markets is not None:
@@ -151,54 +151,41 @@ def get_doctrine_status(target: int = 20) -> pd.DataFrame:
     }).reset_index()
     return short_df, target_df, summary_df
 
-
 def read_doctrine_watchlist(db_name: str = 'wc_fitting') -> list:
-    logger.info(f'connecting to {db_name}')
-    mysql_connection = f"mysql+mysqlconnector://Orthel:Dawson007!27608@localhost:3306/{db_name}"
-    engine = sqlalchemy.create_engine(mysql_connection)
-    conn = engine.connect()
-    logger.info(f'MySql db connection established')
+    try:
+        # Create the connection string without quotes around database name
+        mysql_connection = f"mysql+mysqlconnector://Orthel:Dawson007!27608@localhost:3306/{db_name}"
+        # Create engine with echo=True to see SQL output for debugging
+        engine = sqlalchemy.create_engine(mysql_connection, echo=True)
+        # Test the connection before executing query
+        with engine.connect() as connection:
+            # Your SQL query
+            query = """
+            SELECT DISTINCT t.type_id
+            FROM watch_doctrines as w
+            JOIN fittings_doctrine_fittings f on w.id = f.doctrine_id
+            JOIN fittings_fittingitem t on f.fitting_id = t.fit_id
+            JOIN fittings_type ft on t.type_id = ft.type_id
+            """
+            # Execute query and convert to DataFrame
+            df = pd.read_sql_query(query, connection)
+            # Convert to list and return
+            id_list = df['type_id'].tolist()
+            return id_list
 
-    query = """
-    SELECT DISTINCT t.type_id,ft.type_name
-    FROM watch_doctrines as w
-    JOIN fittings_doctrine_fittings f on w.id = f.doctrine_id
-    JOIN fittings_fittingitem t on f.fitting_id = t.fit_id
-    JOIN fittings_type ft on t.type_id = ft.type_id
-    """
+    except exc.OperationalError as e:
+        print(f"Database connection error: {str(e)}")
+        return []
+    except exc.ProgrammingError as e:
+        print(f"SQL query error: {str(e)}")
+        return []
+    except Exception as e:
+        print(f"Unexpected error: {str(e)}")
+        return []
+    finally:
+        if 'engine' in locals():
+            engine.dispose()
 
-    logger.info(f'executing {query} on {engine}')
-    df = pd.read_sql_query(query, conn)
 
-    print(f'{len(df)} doctrines retrieved')
-    print('closing db connection with engine.dispose()')
-    engine.dispose()
-    id_list = df['type_id'].tolist()
-    print(f'{len(id_list)} doctrines retrieved')
-    print(id_list[:10])
-    return id_list
 if __name__ == "__main__":
-    logger = configure_logging("doctrine_monitor", "logs/doctrines.log")
-    logger.info('starting')
-    doctrine_ids = read_doctrine_watchlist('wc_fitting')
-    print(len(doctrine_ids))
-
-    # print('checking doctrine market status')
-    # print('-------------------------------------')
-    # target = 20
-    # df_short, df_target, df_summary = get_doctrine_status(20)
-    # types = df_target['type_id'].unique().tolist()
-    #
-    # print('-------------------------------')
-    # print('   doctrine status updated')
-    # print('-------------------------------')
-    # fittings = len(df_target['fit_id'].unique().tolist())
-    # print(f'total fittings: {fittings}')
-    # print(f'total items: {len(types)}')
-    # print(f'items with less than {target} on market: {len(df_short)}')
-    # print('writing market data to csv files...')
-    # df_target.to_csv('output/latest/doctrine_status.csv', index=False)
-    # df_short.to_csv('output/latest/short_doctrines.csv', index=False)
-    # df_summary.to_csv('output/latest/summary.csv', index=False)
-    # print('complete')
-    # print('-------------------------------')
+    pass

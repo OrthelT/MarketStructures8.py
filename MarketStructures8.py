@@ -5,15 +5,19 @@ from datetime import datetime
 
 import pandas as pd
 import requests
+from pandas.core.interchange.dataframe_protocol import DataFrame
 from requests import ReadTimeout
 
 import db_handler as dbhandler
 from backupfolder.Doctrine_check import update_doctrines
+
+import sql_handler
 from ESI_OAUTH_FLOW import get_token
 from file_cleanup import rename_move_and_archive_csv
 from get_jita_prices import get_jita_prices
 from logging_tool import configure_logging
 from sql_handler import process_esi_market_order
+from doctrine_monitor import read_doctrine_watchlist, read_market_orders, get_doctrine_status
 
 # GNU General Public License
 #
@@ -158,93 +162,115 @@ def fetch_market_orders():
     print("Returning all orders....")
     print("-----------------------------------------------")
     print("================================================")
+
+    logging.info(
+        f"done. successfully retrieved {len(all_orders)}. connecting to database...")
+    logging.info("saving to database...market orders")
+    df_status = process_esi_market_order(all_orders, False)
+    logging.info(df_status)
+    print('completed database update')
+
+    print("""
+    ---------------------
+    Checking doctrines
+    ----------------------
+    """)
+
     return all_orders
 
 
 # update market history
-def fetch_market_history(type_id_list: list[int]) -> list[dict[str, int | str | float]]:
-    timeout = 10
-    market_history_url = "https://esi.evetech.net/latest/markets/10000003/history/?datasource=tranquility&type_id="
+def fetch_market_history(type_id_list: list[int], fresh_data: bool == True) -> pd.DataFrame:
+    if fresh_data:
+        logging.info('fetching fresh data from ESI')
+        timeout = 10
+        market_history_url = "https://esi.evetech.net/latest/markets/10000003/history/?datasource=tranquility&type_id="
 
-    headers = {
-        "Content-Type": "application/json",
-    }
-    all_history = []
-    page = 1
-    max_pages = 1
-    errorcount = 0
-    tries = 0
-    successful_returns = 0
-
-    print("----------------------------")
-    print("Updating market history...")
-    print("============================")
-    # Iterate over type_ids to fetch market history for 4-HWWF
-    for type_id in range(len(type_id_list)):
-        while page <= max_pages:
-            item = type_id_list[type_id]
-            print(
-                f"\ritems retrieved: {successful_returns}/{len(type_id_list)}", end=""
-            )
-
-            try:
-                response = requests.get(
-                    market_history_url + str(item), headers=headers, timeout=timeout
-                )
-                page += 1
-
-                if "X-Pages" in response.headers:
-                    max_pages = int(response.headers["X-Pages"])
-                else:
-                    max_pages = 1
-
-                if response.status_code != 200:
-                    logging.error("error detected, retrying in 3 seconds...")
-                    time.sleep(3)
-                    errorcount += 1
-                    if tries < 5:
-                        tries += 1
-                        continue
-                    elif tries == 5:
-                        print(
-                            f"Unable to retrieve any data for {item}. Moving on to the next..."
-                        )
-                        page = 1
-                        break
-
-                data = response.json()
-
-                if data:
-                    # Append the type_id to each item in the response
-                    for entry in data:
-                        entry["type_id"] = item  # Add type_id to each record
-                    all_history.extend(data)
-                else:
-                    logging.info(f"Empty response for type_id {item}. Skipping.")
-
-                successful_returns += 1
-                tries = 0
-                max_pages = 1
-
-            except ReadTimeout:
-                logging.info(
-                    f"Request timed out for page {page}, item {item}. Retrying..."
-                )
-                if tries < 5:
-                    tries += 1
-                    time.sleep(3)  # Wait before retrying
-                    continue
-
+        headers = {
+            "Content-Type": "application/json",
+        }
+        all_history = []
         page = 1
         max_pages = 1
+        errorcount = 0
+        tries = 0
+        successful_returns = 0
 
-    logging.info(
-        f"HISTORY COMPLETE: Items found: {successful_returns} Errors:{errorcount}"
-    )
-    print("==========HISTORY COMPLETE==============")
-    logging.info("returning all_history")
-    return all_history
+        print("----------------------------")
+        print("Updating market history...")
+        print("============================")
+        # Iterate over watchlist to fetch market history for 4-HWWF
+        for type_id in range(len(type_id_list)):
+            while page <= max_pages:
+                item = type_id_list[type_id]
+                print(
+                    f"\ritems retrieved: {successful_returns}/{len(type_id_list)}", end=""
+                )
 
+                try:
+                    response = requests.get(
+                        market_history_url + str(item), headers=headers, timeout=timeout
+                    )
+                    page += 1
+
+                    if "X-Pages" in response.headers:
+                        max_pages = int(response.headers["X-Pages"])
+                    else:
+                        max_pages = 1
+
+                    if response.status_code != 200:
+                        logging.error("error detected, retrying in 3 seconds...")
+                        time.sleep(3)
+                        errorcount += 1
+                        if tries < 5:
+                            tries += 1
+                            continue
+                        elif tries == 5:
+                            print(
+                                f"Unable to retrieve any data for {item}. Moving on to the next..."
+                            )
+                            page = 1
+                            break
+
+                    data = response.json()
+
+                    if data:
+                        # Append the type_id to each item in the response
+                        for entry in data:
+                            entry["type_id"] = item  # Add type_id to each record
+                        all_history.extend(data)
+                    else:
+                        logging.info(f"Empty response for type_id {item}. Skipping.")
+
+                    successful_returns += 1
+                    tries = 0
+                    max_pages = 1
+
+                except ReadTimeout:
+                    logging.info(
+                        f"Request timed out for page {page}, item {item}. Retrying..."
+                    )
+                    if tries < 5:
+                        tries += 1
+                        time.sleep(3)  # Wait before retrying
+                        continue
+
+            page = 1
+            max_pages = 1
+        # #save to database
+        logging.info("saving history data to database")
+        df_status = process_esi_market_order(all_history, True)
+        logging.info(df_status)
+        historical_df = pd.DataFrame(all_history)
+
+    else:
+        logging.info('retrieving cached market history data')
+        historical_df = sql_handler.read_history(30)
+
+    logging.info(f"history data complete. {len(historical_df)} records retrieved.")
+    logging.info("returning history_df")
+
+    return historical_df
 
 # ===============================================
 # Functions: Process Market Stats
@@ -270,25 +296,27 @@ def aggregate_sell_orders(market_orders_json: any, ids: list[int]) -> pd.DataFra
     logging.info("returning merged dataframe")
     return merged_df
 
-
 def doctrine_stock(target_stock: int, market_stats: pd.DataFrame) -> pd.DataFrame:
     pass
 
-
 def merge_market_stats(merged_orders, history_data):
+
     grouped_historical_df = history_merge(history_data)
+    grouped_historical_df['type_id'] = grouped_historical_df['type_id'].astype('int64')
+
     merged_data = pd.merge(
         merged_orders, grouped_historical_df, on="type_id", how="left"
     )
-    watchlist_names = watchlist.copy()
-    final_df = pd.merge(merged_data, watchlist_names, on="type_id", how="left")
+    final_df = pd.merge(merged_data, watchlist, on="type_id", how="left")
     return final_df
 
 
-def history_merge(history_data):
+def history_merge(history_data: pd.DataFrame) -> pd.DataFrame:
     logging.info("processing historical data")
     historical_df = history_data
-    historical_df["date"] = pd.to_datetime(historical_df["date"])
+
+    historical_df["date"] = pd.to_datetime(historical_df["date"], errors="coerce")
+
     last_30_days_df = historical_df[
         historical_df["date"] >= pd.to_datetime("today") - pd.DateOffset(days=30)
         ]
@@ -310,81 +338,61 @@ def history_merge(history_data):
     return grouped_historical_df
 
 
-if __name__ == "__main__":
-    # ===============================================
-    # MAIN PROGRAM
-    # -----------------------------------------------
-    # Main function where everything gets executed.
-    start_time = datetime.now()
-    logging.info(f"starting program: {start_time}")
-    # retrieve current type_ids from database
-    logging.info("reading watchlist from database")
-    watchlist = dbhandler.read_watchlist()
-    type_ids = watchlist.typeID.tolist()
-    logging.info(f"retrieved {len(type_ids)} type_ids")
-    print("------------------")
-    print("MARKET ORDERS")
-    print("-----------------")
-    # pull market orders
-    logging.info("starting update...market orders")
-    market_orders = fetch_market_orders()
+def check_doctrine_status(target: int = 20):
+    short_df, target_df, summary_df = get_doctrine_status(target=target)
+    short_items = short_doctrines_item_list(short_df)
+    print(f"""
+        Retrieved Data for Doctrine Fits
+        --------------------------------
+        Items in short supply:  {len(short_df['type_id'].unique())}
+        Items in target supply: {len(target_df['type_id'].unique())}
+        Analyzed fits for: {len(summary_df['fit_id'].unique())}
 
-    logging.info(
-        f"done. successfully retrieved {len(market_orders)}. connecting to database..."
-    )
+        The following items are in short supply:
+        -----------------------------------------
+        {short_items[0:len(short_items) - 1]}  
+        """
+          )
+    short_df.to_csv("output/latest/short_doctrines.csv", index=False)
+    target_df.to_csv("output/latest/target_doctrines.csv", index=False)
+    summary_df.to_csv("output/latest/summary_doctrines.csv", index=False)
+    print("Completed doctrines check")
 
-    # save to database
-    logging.info("saving to database...market orders")
-    df_status = process_esi_market_order(market_orders, False)
-    logging.info(df_status)
 
-    print("------------------")
-    print("MARKET HISTORY")
-    print("------------------")
+def short_doctrines_item_list(short_df: pd.DataFrame) -> pd.DataFrame:
+    short_items = short_df.copy()
+    print(short_items.columns)
+    return short_items
 
-    # update history data
-    logging.info("updating history data")
-    raw_history = fetch_market_history(type_ids)
-    print("connecting to database and updating data")
 
-    # #save to database
-    logging.info("saving history data to database")
-    df_status = process_esi_market_order(raw_history, True)
-    logging.info(df_status)
-    logging.info("updating doctrine tracking")
-    doct_df = update_doctrines()
-    print(doct_df.head())
-
-    historical_df = pd.DataFrame(raw_history)
-    logging.info(f"history data complete. {len(historical_df)} records retrieved.")
-
-    print("------------------")
-    print("PROCESSING ORDERS")
-    print("-----------------")
-    # processing data
+def process_orders(market_orders, history_data, watchlist):
     watchlist.rename(columns={"typeID": "type_id"}, inplace=True)
-
+    logging.info(f'watchlist type: {type(watchlist)}')
+    logging.info(f'market orders type: {type(market_orders)}')
+    logging.info(f'history data type: {type(history_data)}')
     logging.info("aggregating sell orders")
-    merged_sell_orders = aggregate_sell_orders(market_orders, type_ids)
+    merged_sell_orders = aggregate_sell_orders(market_orders, watchlist)
     logging.info("merging historical data")
-    final_data = merge_market_stats(merged_sell_orders, historical_df)
+    final_data = merge_market_stats(merged_sell_orders, history_data)
     logging.info("getting jita prices")
     vale_jita = get_jita_prices(final_data)
+    return vale_jita, final_data
 
-    # save files
-    logging.info("-----------saving files and exiting----------------")
-    # reorder history columns
-    new_columns = [
-        "date",
-        "type_id",
-        "highest",
-        "lowest",
-        "average",
-        "order_count",
-        "volume",
-    ]
-    historical_df = historical_df[new_columns]
-    historical_df.to_csv(history_filename, index=False)
+
+def save_data(history: DataFrame, vale_jita: DataFrame, final_data: DataFrame, fresh_data: bool = True):
+    if fresh_data:
+        new_columns = [
+            "date",
+            "type_id",
+            "highest",
+            "lowest",
+            "average",
+            "order_count",
+            "volume",
+        ]
+        history = history[new_columns]
+        history.to_csv(history_filename, index=False)
+
     final_data.to_csv(market_stats_filename, index=False)
 
     # save a copy of market stats to update spreadsheet consistently named
@@ -396,6 +404,51 @@ if __name__ == "__main__":
 
     logging.info("saving vale_jita data")
     vale_jita.to_csv("output/latest/vale_jita.csv", index=False)
+
+    logging.info('saving market stats to database')
+    status = sql_handler.update_stats(final_data)
+
+    print(status)
+
+
+if __name__ == "__main__":
+    # ===============================================
+    # MAIN PROGRAM
+    # -----------------------------------------------
+    # Main function where everything gets executed.
+
+    # Update full market history with fresh data?
+    fresh_data_choice = True
+
+    start_time = datetime.now()
+    logging.info(f"starting program: {start_time}")
+    # retrieve current watchlist from database
+    logging.info("reading watchlist from database")
+    watchlist = dbhandler.read_watchlist()
+    watchlist = watchlist.typeID.tolist()
+    type_ids = []
+    doctrine_watchlist = read_doctrine_watchlist('wc_fitting')
+
+    logging.info(f"retrieved {len(watchlist)} type_ids")
+    print("------------------")
+    print("MARKET ORDERS")
+    print("-----------------")
+    logging.info("starting update...market orders")
+
+    # =========================================
+    market_orders = fetch_market_orders()
+    # ==========================================
+    # ============================
+    check_doctrine_status()
+    # ===========================
+    # update history data
+    logging.info("updating history data")
+    # =============================================
+    historical_df = fetch_market_history(watchlist, fresh_data_choice)
+    # ==============================================
+    vale_jita, final_data = process_orders(market_orders, historical_df, watchlist)
+    save_data(historical_df, vale_jita, final_data, fresh_data_choice)
+
     # Completed stats
     finish_time = datetime.now()
     total_time = finish_time - start_time
