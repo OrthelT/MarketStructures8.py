@@ -65,7 +65,6 @@ master_history_filename = "data/masterhistory/valemarkethistory_{datetime.now().
 
 logger = configure_logging("mkt_structures", "logs/esi_mkt.log")
 
-
 # ===============================================
 # Functions: Fetch Market Structure Orders
 # -----------------------------------------------
@@ -173,7 +172,6 @@ def fetch_market_orders():
 
     return all_orders
 
-
 # update market history
 def fetch_market_history(fresh_data: bool == True) -> pd.DataFrame:
     watchlist = dbhandler.read_watchlist()
@@ -269,23 +267,24 @@ def fetch_market_history(fresh_data: bool == True) -> pd.DataFrame:
     logging.info("returning history_df")
 
     return historical_df
-
 # ===============================================
 # Functions: Process Market Stats
 # -----------------------------------------------
 def aggregate_sell_orders(market_orders_json: any) -> pd.DataFrame:
     logging.info("aggregating sell orders")
     logging.info(f'market orders type:{type(market_orders_json)}')
-    orders = pd.DataFrame(market_orders_json)
-    logging.info("filtering orders")
 
+    orders = pd.DataFrame(market_orders_json)
     ids = dbhandler.read_watchlist()
-    ids = ids["type_id"].unique().tolist()
+    ids = ids["type_id"].tolist()
 
     filtered_orders = orders[orders["type_id"].isin(ids)]
     sell_orders = filtered_orders[filtered_orders["is_buy_order"] == False]
 
+    logging.info(f'filtered orders: {len(filtered_orders)}')
+    logging.info(f'sell orders: {len(sell_orders)}')
     logging.info("aggregating orders")
+
     grouped_df = sell_orders.groupby("type_id")["volume_remain"].sum().reset_index()
     grouped_df.columns = ["type_id", "total_volume_remain"]
     min_price_df = sell_orders.groupby("type_id")["price"].min().reset_index()
@@ -297,12 +296,11 @@ def aggregate_sell_orders(market_orders_json: any) -> pd.DataFrame:
     merged_df = pd.merge(grouped_df, min_price_df, on="type_id")
     merged_df = pd.merge(merged_df, percentile_5th_df, on="type_id")
     logging.info("successfully merged dataframes and completed aggregation")
-    logging.info("returning merged dataframe")
+    logging.info(f"returning merged dataframe with {len(merged_df)} rows")
     return merged_df
 
 def doctrine_stock(target_stock: int, market_stats: pd.DataFrame) -> pd.DataFrame:
     pass
-
 
 def merge_market_stats(merged_orders: pd.DataFrame, history_data: pd.DataFrame):
 
@@ -313,8 +311,14 @@ def merge_market_stats(merged_orders: pd.DataFrame, history_data: pd.DataFrame):
         merged_orders, grouped_historical_df, on="type_id", how="left"
     )
     final_df = pd.merge(merged_data, watchlist, on="type_id", how="left")
-    return final_df
 
+    final_df["days_remaining"] = final_df.apply(
+        lambda row: 0 if row["avg_daily_volume"] == 0 else row["total_volume_remain"] / row["avg_daily_volume"],
+        axis=1
+    )
+    final_df["days_remaining"] = final_df["days_remaining"].round(1)
+
+    return final_df
 
 def history_merge(history_data: pd.DataFrame) -> pd.DataFrame:
     logging.info("processing historical data")
@@ -400,6 +404,7 @@ def save_data(history: DataFrame, vale_jita: DataFrame, final_data: DataFrame, f
         history.to_csv(history_filename, index=False)
 
     final_data.to_csv(market_stats_filename, index=False)
+    status = sql_handler.update_stats(final_data)
 
     # save a copy of market stats to update spreadsheet consistently named
     src_folder = r"output"
@@ -412,7 +417,6 @@ def save_data(history: DataFrame, vale_jita: DataFrame, final_data: DataFrame, f
     vale_jita.to_csv("output/latest/vale_jita.csv", index=False)
 
     logging.info('saving market stats to database')
-    status = sql_handler.update_stats(final_data)
 
     print(status)
 

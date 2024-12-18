@@ -42,6 +42,21 @@ history_columns = [
     "volume",
 ]
 
+stats_columns = [
+    'type_id',
+    'total_volume_remain',
+    'min_price',
+    'price_5th_percentile',
+    'avg_of_avg_price',
+    'avg_daily_volume',
+    'group_id',
+    'type_name',
+    'group_name',
+    'category_id',
+    'days_remaining'
+    'timestamp'
+]
+
 
 class Base(DeclarativeBase):
     pass
@@ -75,7 +90,7 @@ class MarketHistory(Base):
     __table_args__ = (PrimaryKeyConstraint("date", "type_id"),)
 
 
-class Market_Stats(Base):
+class MarketStats(Base):
     __tablename__ = "Market_Stats"
     type_id: Mapped[str] = mapped_column(String(10), primary_key=True)
     total_volume_remain: Mapped[int] = mapped_column(Integer)
@@ -88,6 +103,9 @@ class Market_Stats(Base):
     group_name: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     category_id: Mapped[str] = mapped_column(String(10))
     category_name: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    days_remaining: Mapped[int] = mapped_column(Integer)
+    timestamp: Mapped[datetime] = mapped_column(DateTime)
+
 
 class Doctrine_Fits(Base):
     __tablename__ = "Doctrine_Fittings"
@@ -168,7 +186,7 @@ def insert_timestamp(df: pl.DataFrame) -> pl.DataFrame:
     return df
 
 def initialize_database(engine, base):
-    """Create all database tables."""
+    # # """Create all database tables."""
     # base.metadata.create_all(engine)
     pass
 
@@ -320,35 +338,49 @@ def update_current_orders(df: pl.DataFrame) -> str:
     return status
 
 
-def update_stats(df: pl.DataFrame) -> str:
+def update_stats(df: pd.DataFrame) -> str:
     df = df.fillna(0)
-
+    df_pl = pl.from_pandas(df)
+    df_processed = insert_timestamp(df_pl)
+    records = df_processed.to_dicts()
     engine = create_engine(f"sqlite:///{sql_file}", echo=False)
     Base.metadata.create_all(engine)
+
     # Create a session factory
-    Session = sessionmaker(bind=engine)
-    session = Session()
-    # Let's assume your DataFrame is called 'df'
-    # This is the most efficient way to bulk insert the data
-    try:
-        # Convert DataFrame to a list of dictionaries
-        # Each dictionary represents one row with column names as keys
-        records = df.to_dict(orient='records')
-        # Create Market_Stats objects from the dictionaries
-        market_stats_objects = [Market_Stats(**record) for record in records]
-        # Bulk insert all records at once
-        session.bulk_save_objects(market_stats_objects)
-        session.commit()
-        status = "Data loading completed successfully!"
-    except Exception as e:
-        # If something goes wrong, roll back the session
-        session.rollback()
-        status = f"An error occurred: {e}"
+    with engine.connect() as conn:
+        batch_size = 1000
+        status = "failed"
+        current_statement = """
+            INSERT INTO market_stats
+                (type_id, total_volume_remain, min_price, price_5th_percentile, avg_of_avg_price, avg_daily_volume, group_id, type_name, group_name, category_id, category_name, days_remaining, timestamp)
+                VALUES
+                (:type_id, :total_volume_remain, :min_price, :price_5th_percentile, :avg_of_avg_price, :avg_daily_volume, :group_id, :type_name, :group_name, :category_id, :category_name, :days_remaining, :timestamp);
+            """
 
-    finally:
-        # Always close the session when you're done
-        session.close()
+        clear_table = "DELETE FROM market_stats;"
 
+        try:
+            conn.execute(text(clear_table))
+            conn.commit()
+        except Exception as e:
+            print(f"Error clearing table: {str(e)}")
+            raise
+        print("table cleared")
+
+        try:
+            for i in range(0, len(records), batch_size):
+                batch = records[i: i + batch_size]
+                conn.execute(text(current_statement), batch)
+                conn.commit()
+                print(
+                    f"\rProcessed records {i} to {min(i + batch_size, len(records))}",
+                    end="",
+                )
+        except Exception as e:
+            print(f"Error inserting data: {str(e)}")
+            raise
+
+    status = "Data loading completed successfully!"
     return status
 
 def read_history(doys: int = 30) -> pd.DataFrame:
@@ -368,7 +400,9 @@ def read_history(doys: int = 30) -> pd.DataFrame:
     return historydf
 
 if __name__ == "__main__":
-    pass
+    df = pd.read_csv('output/latest/valemarketstats_latest.csv')
+    status = update_stats(df)
+    print(status)
     # with open ('tests/test_market_orders.json') as f:
     #     orders = json.load(f)
     # print(orders)
