@@ -22,10 +22,10 @@ def get_credentials(SCOPES: list):
     return gc
 
 
-def test_google_sheet_updater(df: pd.DataFrame) -> str:
+def google_sheet_updater(df: pd.DataFrame) -> str:
     gc = get_credentials(SCOPES)
     # Open the Google Sheet by name
-    sheet = gc.open("test").sheet1  # Replace with your sheet name
+    sheet = gc.open("4H Market Status").sheet1  # Replace with your sheet name
     # Step 3: Update the sheet
     # Example: Write a Pandas DataFrame to the Google Sheet
     # data = {
@@ -51,4 +51,4 @@ if __name__ == "__main__":
                 'min_price',
                 'avg_of_avg_price', 'avg_daily_volume', 'group_id', 'category_id', 'category_name', 'timestamp']
     market_stats = market_stats[new_cols]
-    test_google_sheet_updater(market_stats)
+    google_sheet_updater(market_stats)
