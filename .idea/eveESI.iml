@@ -11,6 +11,9 @@
       <excludeFolder url="file://$MODULE_DIR$/data/watchlist_update" />
       <excludeFolder url="file://$MODULE_DIR$/endpoints" />
       <excludeFolder url="file://$MODULE_DIR$/logs" />
+      <excludeFolder url="file://$MODULE_DIR$/data/doctrines" />
+      <excludeFolder url="file://$MODULE_DIR$/data/short_files" />
+      <excludeFolder url="file://$MODULE_DIR$/tests" />
     </content>
     <orderEntry type="jdk" jdkName="Python 3.13" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />

@@ -1,5 +1,6 @@
 import pandas as pd
 import requests
+import json
 
 # Tools to retrieve Jita prices using the Fuzzworks market API
 # Sample data to use for testing
@@ -7,18 +8,14 @@ import requests
 def get_jita_prices(vale_data):
     regionid = '10000002'
     base_url = 'https://market.fuzzwork.co.uk/aggregates/?region='
-    ids_str = get_vale_type_ids(vale_data)
+    ids = vale_data['type_id'].to_list()
+    ids_str = ','.join(map(str, ids))
     url = f'{base_url}{regionid}&types={ids_str}'
     response = requests.get(url)
     data = response.json()
     jita_data = parse_json(data)
     merged_df = merge_vale_data(jita_data, vale_data)
     return merged_df
-
-def get_vale_type_ids(vale_data):
-    ids = vale_data['type_id'].to_list()
-    ids_str = ','.join(map(str, ids))
-    return ids_str
 
 def merge_vale_data(jita_data, vale_data):
     vale_df = vale_data.copy()
@@ -52,3 +49,6 @@ def parse_json(data) -> pd.DataFrame:
 
     return df
 
+
+if __name__ == "__main__":
+    pass

@@ -4,9 +4,6 @@ import sqlalchemy
 from sqlalchemy import exc
 
 from db_handler import read_market_orders
-from logging_tool import configure_logging
-
-logger = configure_logging()
 
 
 def get_doctrine_fits(db_name: str = 'wc_fitting'):

@@ -1,11 +1,8 @@
 import logging
 from logging.handlers import RotatingFileHandler
 
-from tornado.gen import Return
-
-
 def configure_logging(
-        log_name: str = "report_log", log_file: str = "log_report.log"
+        log_name: str = "report_log", log_file: str = "logs/log_report.log"
 ) -> logging.Logger:
     # Create logger
     logger = logging.getLogger(log_name)

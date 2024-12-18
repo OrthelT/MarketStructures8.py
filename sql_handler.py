@@ -4,7 +4,10 @@ import polars as pl
 import pandas as pd
 from datetime import datetime, timezone
 from typing import Optional
+import json
 
+from IPython.terminal.shortcuts.filters import cursor_in_leading_ws
+from altair import Cursor
 from pyarrow import int64
 from sqlalchemy import (
     create_engine,
@@ -274,28 +277,26 @@ def process_esi_market_order(data: list, is_history: Boolean = False) -> str:
 
     return status
 
-
 def update_current_orders(df: pl.DataFrame) -> str:
     df_processed = insert_type_names(df)
     records = df_processed.to_dicts()
 
     engine = create_engine(f"sqlite:///{sql_file}", echo=False)
-    batch_size = 1000
-    status = "failed"
-    current_statement = """
-        INSERT INTO current_orders
-            (order_id, type_id, type_name, volume_remain, price, issued, duration, is_buy_order, timestamp)
-            VALUES
-            (:order_id, :type_id, :type_name, :volume_remain, :price, :issued, :duration, :is_buy_order, :timestamp);
-        """
-
-    clear_table = """
-        DELETE FROM current_orders;
+    with engine.connect() as conn:
+        batch_size = 1000
+        status = "failed"
+        current_statement = """
+            INSERT INTO current_orders
+                (order_id, type_id, type_name, volume_remain, price, issued, duration, is_buy_order, timestamp)
+                VALUES
+                (:order_id, :type_id, :type_name, :volume_remain, :price, :issued, :duration, :is_buy_order, :timestamp);
             """
-    with engine.begin() as conn:
+
+        clear_table = "DELETE FROM current_orders;"
 
         try:
             conn.execute(text(clear_table))
+            conn.commit()
         except Exception as e:
             print(f"Error clearing table: {str(e)}")
             raise
@@ -305,14 +306,16 @@ def update_current_orders(df: pl.DataFrame) -> str:
             for i in range(0, len(records), batch_size):
                 batch = records[i: i + batch_size]
                 conn.execute(text(current_statement), batch)
+                conn.commit()
                 print(
                     f"\rProcessed records {i} to {min(i + batch_size, len(records))}",
                     end="",
                 )
-            status = "Data loading completed successfully!"
         except Exception as e:
             print(f"Error inserting data: {str(e)}")
             raise
+
+    status = "Data loading completed successfully!"
 
     return status
 
@@ -348,7 +351,6 @@ def update_stats(df: pl.DataFrame) -> str:
 
     return status
 
-
 def read_history(doys: int = 30) -> pd.DataFrame:
     engine = create_engine(f"sqlite:///{sql_file}", echo=True)
     # Create a session factory
@@ -366,4 +368,9 @@ def read_history(doys: int = 30) -> pd.DataFrame:
     return historydf
 
 if __name__ == "__main__":
-    engine = create_engine(f"sqlite:///{sql_file}", echo=False)
+    pass
+    # with open ('tests/test_market_orders.json') as f:
+    #     orders = json.load(f)
+    # print(orders)
+    # status = process_esi_market_order(orders)
+    # print(status)
