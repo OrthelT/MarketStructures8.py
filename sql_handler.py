@@ -6,9 +6,6 @@ from datetime import datetime, timezone
 from typing import Optional
 import json
 
-from IPython.terminal.shortcuts.filters import cursor_in_leading_ws
-from altair import Cursor
-from pyarrow import int64
 from sqlalchemy import (
     create_engine,
     String,
@@ -18,10 +15,13 @@ from sqlalchemy import (
     Boolean,
     PrimaryKeyConstraint,
     text,
+    Table,
 )
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker, foreign
+from sqlalchemy.orm import DeclarativeBase, declarative_base, mapped_column, sessionmaker, foreign, Mapped
+from tornado.gen import Return
 
 sql_file = "market_orders.sqlite"
+Base = declarative_base()
 
 market_columns = [
     "type_id",
@@ -41,7 +41,6 @@ history_columns = [
     "order_count",
     "volume",
 ]
-
 stats_columns = [
     'type_id',
     'total_volume_remain',
@@ -57,10 +56,6 @@ stats_columns = [
     'timestamp'
 ]
 
-
-class Base(DeclarativeBase):
-    pass
-
 class MarketOrder(Base):
     __tablename__ = "market_order"
 
@@ -73,6 +68,7 @@ class MarketOrder(Base):
     duration: Mapped[int] = mapped_column(Integer)
     is_buy_order: Mapped[bool] = mapped_column(Boolean)
     timestamp: Mapped[datetime] = mapped_column(DateTime)
+
 
 class MarketHistory(Base):
     __tablename__ = "market_history"
@@ -89,7 +85,6 @@ class MarketHistory(Base):
     # Add composite primary key
     __table_args__ = (PrimaryKeyConstraint("date", "type_id"),)
 
-
 class MarketStats(Base):
     __tablename__ = "Market_Stats"
     type_id: Mapped[str] = mapped_column(String(10), primary_key=True)
@@ -105,7 +100,6 @@ class MarketStats(Base):
     category_name: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     days_remaining: Mapped[int] = mapped_column(Integer)
     timestamp: Mapped[datetime] = mapped_column(DateTime)
-
 
 class Doctrine_Fits(Base):
     __tablename__ = "Doctrine_Fittings"
@@ -137,6 +131,28 @@ class CurrentOrders(Base):
     duration: Mapped[int] = mapped_column(Integer)
     is_buy_order: Mapped[bool] = mapped_column(Boolean)
     timestamp: Mapped[datetime] = mapped_column(DateTime)
+
+
+class ShortItems(Base):
+    __tablename__ = "ShortItems"
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    fit_id: Mapped[int] = mapped_column(Integer)
+    doctrine_name: Mapped[str] = mapped_column(String(100))
+    type_id: Mapped[int] = mapped_column(Integer)
+    type_name: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    quantity: Mapped[int] = mapped_column(Integer, nullable=True)
+    volume_remain: Mapped[float] = mapped_column(Float, nullable=True)
+    price: Mapped[float] = mapped_column(Float, nullable=True)
+    fits_on_market: Mapped[int] = mapped_column(Integer, nullable=True)
+    delta: Mapped[float] = mapped_column(Float, nullable=True)
+    timestamp: Mapped[datetime] = mapped_column(DateTime, nullable=True)
+
+
+def create_session():
+    engine = create_engine(f"sqlite:///{sql_file}", echo=False)
+    Session = sessionmaker(bind=engine)
+    session = Session()
+    return session
 
 def process_dataframe(
         df: pl.DataFrame, columns: list, date_column: str = None
@@ -183,6 +199,7 @@ def insert_timestamp(df: pl.DataFrame) -> pl.DataFrame:
     df = df.with_columns(
         pl.lit(ts).alias("timestamp"),
     )
+    print(df)
     return df
 
 def initialize_database(engine, base):
@@ -295,6 +312,23 @@ def process_esi_market_order(data: list, is_history: Boolean = False) -> str:
 
     return status
 
+
+def read_history(doys: int = 30) -> pd.DataFrame:
+    engine = create_engine(f"sqlite:///{sql_file}", echo=True)
+    # Create a session factory
+    session = engine.connect()
+    print(f'connection established: {session} by sql_handler.read_history()')
+    d = f"'-{doys} days'"
+
+    stmt = f"""
+    SELECT * FROM market_history
+    WHERE date >= date('now', {d})"""
+
+    historydf = pd.read_sql(stmt, session)
+    session.close()
+    print(f'connection closed: {session}...returning orders from market_history table.')
+    return historydf
+
 def update_current_orders(df: pl.DataFrame) -> str:
     df_processed = insert_type_names(df)
     records = df_processed.to_dicts()
@@ -337,71 +371,117 @@ def update_current_orders(df: pl.DataFrame) -> str:
 
     return status
 
-
 def update_stats(df: pd.DataFrame) -> str:
+    # process the df
     df = df.fillna(0)
     df_pl = pl.from_pandas(df)
     df_processed = insert_timestamp(df_pl)
+
     records = df_processed.to_dicts()
-    engine = create_engine(f"sqlite:///{sql_file}", echo=False)
-    Base.metadata.create_all(engine)
 
-    # Create a session factory
-    with engine.connect() as conn:
+    # start a session
+    session = create_session()
+
+    try:
+        # Clear the table
+        session.query(MarketStats).delete()
+        session.commit()
+        print("Table cleared")
+
+        # Insert new records
         batch_size = 1000
-        status = "failed"
-        current_statement = """
-            INSERT INTO market_stats
-                (type_id, total_volume_remain, min_price, price_5th_percentile, avg_of_avg_price, avg_daily_volume, group_id, type_name, group_name, category_id, category_name, days_remaining, timestamp)
-                VALUES
-                (:type_id, :total_volume_remain, :min_price, :price_5th_percentile, :avg_of_avg_price, :avg_daily_volume, :group_id, :type_name, :group_name, :category_id, :category_name, :days_remaining, :timestamp);
-            """
-
-        clear_table = "DELETE FROM market_stats;"
-
-        try:
-            conn.execute(text(clear_table))
-            conn.commit()
-        except Exception as e:
-            print(f"Error clearing table: {str(e)}")
-            raise
-        print("table cleared")
-
-        try:
-            for i in range(0, len(records), batch_size):
-                batch = records[i: i + batch_size]
-                conn.execute(text(current_statement), batch)
-                conn.commit()
-                print(
-                    f"\rProcessed records {i} to {min(i + batch_size, len(records))}",
-                    end="",
+        for i in range(0, len(records), batch_size):
+            batch = records[i:i + batch_size]
+            stats_objects = [
+                MarketStats(
+                    type_id=record["type_id"],
+                    total_volume_remain=record["total_volume_remain"],
+                    min_price=record["min_price"],
+                    price_5th_percentile=record["price_5th_percentile"],
+                    avg_of_avg_price=record["avg_of_avg_price"],
+                    avg_daily_volume=record["avg_daily_volume"],
+                    group_id=record["group_id"],
+                    type_name=record["type_name"],
+                    group_name=record["group_name"],
+                    category_id=record["category_id"],
+                    category_name=record["category_name"],
+                    days_remaining=record["days_remaining"],
+                    timestamp=record["timestamp"],
                 )
-        except Exception as e:
-            print(f"Error inserting data: {str(e)}")
-            raise
+                for record in batch
+            ]
+            session.add_all(stats_objects)
+            session.commit()
+            print(
+                f"\rProcessed records {i} to {min(i + batch_size, len(records))}",
+                end="",
+            )
+    except Exception as e:
+        session.rollback()
+        print(f"Error occurred: {str(e)}")
+        raise
+    finally:
+        session.close()
 
-    status = "Data loading completed successfully!"
-    return status
+    return "Data loading completed successfully!"
 
-def read_history(doys: int = 30) -> pd.DataFrame:
-    engine = create_engine(f"sqlite:///{sql_file}", echo=True)
-    # Create a session factory
-    session = engine.connect()
-    print(f'connection established: {session} by sql_handler.read_history()')
-    d = f"'-{doys} days'"
 
-    stmt = f"""
-    SELECT * FROM market_history
-    WHERE date >= date('now', {d})"""
+def update_short_items(df: pd.DataFrame) -> str:
+    # process the df
+    df_pl = pl.from_pandas(df)
+    df_processed = insert_timestamp(df_pl)
+    df_pl.fill_null(0)
+    records = df_processed.to_dicts()
+    # start a session
+    session = create_session()
+    try:
+        # Clear the table
+        session.query(MarketStats).delete()
+        session.commit()
+        print("Table cleared")
 
-    historydf = pd.read_sql(stmt, session)
-    session.close()
-    print(f'connection closed: {session}...returning orders from market_history table.')
-    return historydf
+        # Insert new records
+        batch_size = 1000
+        for i in range(0, len(records), batch_size):
+            batch = records[i:i + batch_size]
+            short_objects = [
+                ShortItems(
+                    fit_id=record["fit_id"],
+                    doctrine_name=record["doctrine_name"],
+                    type_id=record["type_id"],
+                    type_name=record["type_name"],
+                    quantity=record["quantity"],
+                    volume_remain=record["volume_remain"],
+                    price=record["price"],
+                    fits_on_market=record["fits_on_market"],
+                    delta=record["delta"]
+                )
+
+                for record in batch
+            ]
+            session.add_all(short_objects)
+            session.commit()
+            print(
+                f"\rProcessed records {i} to {min(i + batch_size, len(records))}",
+                end="",
+            )
+    except Exception as e:
+        session.rollback()
+        print(f"Error occurred: {str(e)}")
+        raise
+    finally:
+        session.close()
+    return "Short items loading completed successfully!"
+
 
 if __name__ == "__main__":
-    df = pd.read_csv('output/latest/valemarketstats_latest.csv')
-    status = update_stats(df)
+    session = create_session()
+
+    shortdf_cols = ['fit_id', 'doctrine_name', 'type_id', 'type_name', 'quantity',
+                    'volume_remain', 'price', 'fits_on_market', 'delta']
+
+    df = pd.read_csv('output/latest/short_doctrines.csv')
+    status = update_short_items(df)
     print(status)
     # with open ('tests/test_market_orders.json') as f:
     #     orders = json.load(f)

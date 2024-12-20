@@ -299,9 +299,6 @@ def aggregate_sell_orders(market_orders_json: any) -> pd.DataFrame:
     logging.info(f"returning merged dataframe with {len(merged_df)} rows")
     return merged_df
 
-def doctrine_stock(target_stock: int, market_stats: pd.DataFrame) -> pd.DataFrame:
-    pass
-
 def merge_market_stats(merged_orders: pd.DataFrame, history_data: pd.DataFrame):
 
     grouped_historical_df = history_merge(history_data)
@@ -346,7 +343,6 @@ def history_merge(history_data: pd.DataFrame) -> pd.DataFrame:
     logging.info("history data processed. returning grouped historical data")
     return grouped_historical_df
 
-
 def check_doctrine_status(target: int = 20):
     short_df, target_df, summary_df = get_doctrine_status(target=target)
     short_items = short_doctrines_item_list(short_df)
@@ -367,12 +363,10 @@ def check_doctrine_status(target: int = 20):
     summary_df.to_csv("output/latest/summary_doctrines.csv", index=False)
     print("Completed doctrines check")
 
-
 def short_doctrines_item_list(short_df: pd.DataFrame) -> pd.DataFrame:
     short_items = short_df.copy()
     print(short_items.columns)
     return short_items
-
 
 def process_orders(market_orders, history_data):
 
@@ -390,6 +384,7 @@ def process_orders(market_orders, history_data):
 
 
 def save_data(history: DataFrame, vale_jita: DataFrame, final_data: DataFrame, fresh_data: bool = True):
+    update_time = datetime.now()
     if fresh_data:
         new_columns = [
             "date",
@@ -399,8 +394,10 @@ def save_data(history: DataFrame, vale_jita: DataFrame, final_data: DataFrame, f
             "average",
             "order_count",
             "volume",
+            "last_updated",
         ]
         history = history[new_columns]
+        history[update_time] = update_time
         history.to_csv(history_filename, index=False)
 
     final_data.to_csv(market_stats_filename, index=False)
@@ -428,7 +425,7 @@ if __name__ == "__main__":
     # Main function where everything gets executed.
 
     # Update full market history with fresh data?
-    fresh_data_choice = True
+    fresh_data_choice = False
 
     start_time = datetime.now()
     logger.info(f"starting program: {start_time}")
