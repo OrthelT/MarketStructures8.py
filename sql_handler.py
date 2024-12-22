@@ -6,6 +6,8 @@ from datetime import datetime, timezone
 from typing import Optional
 import json
 
+from Demos.win32ts_logoff_disconnected import session
+from jinja2.nodes import Continue
 from sqlalchemy import (
     create_engine,
     String,
@@ -17,6 +19,7 @@ from sqlalchemy import (
     text,
     Table,
 )
+from sqlalchemy.future import engine
 from sqlalchemy.orm import DeclarativeBase, declarative_base, mapped_column, sessionmaker, foreign, Mapped
 from tornado.gen import Return
 
@@ -92,13 +95,14 @@ class MarketStats(Base):
     min_price: Mapped[float] = mapped_column(Float)
     price_5th_percentile: Mapped[float] = mapped_column(Float)
     avg_of_avg_price: Mapped[float] = mapped_column(Float)
+    avg_of_avg_price: Mapped[float] = mapped_column(Float, nullable=True)
     avg_daily_volume: Mapped[float] = mapped_column(Float)
     group_id: Mapped[str] = mapped_column(String(10))
-    type_name: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    type_name: Mapped[Optional[str]] = mapped_column(String(100))
     group_name: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     category_id: Mapped[str] = mapped_column(String(10))
     category_name: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
-    days_remaining: Mapped[int] = mapped_column(Integer)
+    days_remaining: Mapped[int] = mapped_column(Integer, nullable=True)
     timestamp: Mapped[datetime] = mapped_column(DateTime)
 
 class Doctrine_Fits(Base):
@@ -145,14 +149,16 @@ class ShortItems(Base):
     price: Mapped[float] = mapped_column(Float, nullable=True)
     fits_on_market: Mapped[int] = mapped_column(Integer, nullable=True)
     delta: Mapped[float] = mapped_column(Float, nullable=True)
+    doctrine_id: Mapped[int] = mapped_column(Integer, nullable=True)
+    ship_type_id: Mapped[int] = mapped_column(Integer, nullable=True)
     timestamp: Mapped[datetime] = mapped_column(DateTime, nullable=True)
 
 
 def create_session():
     engine = create_engine(f"sqlite:///{sql_file}", echo=False)
     Session = sessionmaker(bind=engine)
-    session = Session()
-    return session
+
+    return Session, engine
 
 def process_dataframe(
         df: pl.DataFrame, columns: list, date_column: str = None
@@ -312,7 +318,6 @@ def process_esi_market_order(data: list, is_history: Boolean = False) -> str:
 
     return status
 
-
 def read_history(doys: int = 30) -> pd.DataFrame:
     engine = create_engine(f"sqlite:///{sql_file}", echo=True)
     # Create a session factory
@@ -373,16 +378,18 @@ def update_current_orders(df: pl.DataFrame) -> str:
 
 def update_stats(df: pd.DataFrame) -> str:
     # process the df
-    df = df.fillna(0)
+    df.fillna(0)
     df_pl = pl.from_pandas(df)
     df_processed = insert_timestamp(df_pl)
 
     records = df_processed.to_dicts()
 
     # start a session
-    session = create_session()
+    engine = create_engine(f"sqlite:///{sql_file}", echo=False)
+    Session = sessionmaker(bind=engine)
 
-    try:
+    with Session() as session:  # Corrected the session instantiation
+        try:
         # Clear the table
         session.query(MarketStats).delete()
         session.commit()
@@ -416,27 +423,31 @@ def update_stats(df: pd.DataFrame) -> str:
                 f"\rProcessed records {i} to {min(i + batch_size, len(records))}",
                 end="",
             )
-    except Exception as e:
-        session.rollback()
-        print(f"Error occurred: {str(e)}")
-        raise
-    finally:
-        session.close()
+        except Exception as e:
+            session.rollback()
+            print(f"Error occurred: {str(e)}")
+            raise
+        finally:
+            session.close()
 
     return "Data loading completed successfully!"
 
-
 def update_short_items(df: pd.DataFrame) -> str:
     # process the df
+    df = df.fillna("").replace([float('inf'), float('-inf')], 0)
     df_pl = pl.from_pandas(df)
     df_processed = insert_timestamp(df_pl)
     df_pl.fill_null(0)
     records = df_processed.to_dicts()
     # start a session
-    session = create_session()
-    try:
+    engine = create_engine(f"sqlite:///{sql_file}", echo=False)
+    Session = sessionmaker(bind=engine)
+
+    with Session() as session:  # Corrected the session instantiation
+        try:
+
         # Clear the table
-        session.query(MarketStats).delete()
+        session.query(ShortItems).delete()
         session.commit()
         print("Table cleared")
 
@@ -454,37 +465,35 @@ def update_short_items(df: pd.DataFrame) -> str:
                     volume_remain=record["volume_remain"],
                     price=record["price"],
                     fits_on_market=record["fits_on_market"],
-                    delta=record["delta"]
+                    delta=record["delta"],
+
                 )
 
                 for record in batch
             ]
             session.add_all(short_objects)
             session.commit()
+
             print(
                 f"\rProcessed records {i} to {min(i + batch_size, len(records))}",
                 end="",
             )
-    except Exception as e:
-        session.rollback()
-        print(f"Error occurred: {str(e)}")
-        raise
-    finally:
-        session.close()
+        except Exception as e:
+            session.rollback()
+            print(f"Error occurred: {str(e)}")
+            raise
+
     return "Short items loading completed successfully!"
 
 
+def read_short_items() -> pd.DataFrame:
+    engine = create_engine(f"sqlite:///{sql_file}", echo=True)
+    df = pd.read_sql_query("SELECT * FROM ShortItems", engine)
+    engine.dispose()
+    print(f'connection closed: {engine}...returning orders from ShortItems table.')
+
+    return df
+
+
 if __name__ == "__main__":
-    session = create_session()
-
-    shortdf_cols = ['fit_id', 'doctrine_name', 'type_id', 'type_name', 'quantity',
-                    'volume_remain', 'price', 'fits_on_market', 'delta']
-
-    df = pd.read_csv('output/latest/short_doctrines.csv')
-    status = update_short_items(df)
-    print(status)
-    # with open ('tests/test_market_orders.json') as f:
-    #     orders = json.load(f)
-    # print(orders)
-    # status = process_esi_market_order(orders)
-    # print(status)
+    pass

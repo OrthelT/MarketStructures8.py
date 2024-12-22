@@ -3,7 +3,6 @@ import logging
 import os
 import time
 from datetime import datetime
-from os import write
 
 import pandas as pd
 import requests
@@ -11,9 +10,9 @@ from pandas.core.interchange.dataframe_protocol import DataFrame
 from requests import ReadTimeout
 
 import db_handler as dbhandler
-from backupfolder.Doctrine_check import update_doctrines
-
+import doctrine_monitor
 import sql_handler
+import google_sheet_updater
 from ESI_OAUTH_FLOW import get_token
 from file_cleanup import rename_move_and_archive_csv
 from get_jita_prices import get_jita_prices
@@ -346,6 +345,16 @@ def history_merge(history_data: pd.DataFrame) -> pd.DataFrame:
 def check_doctrine_status(target: int = 20):
     short_df, target_df, summary_df = get_doctrine_status(target=target)
     short_items = short_doctrines_item_list(short_df)
+
+    doctrines = doctrine_monitor.get_doctrine_fits()
+    doctrines = doctrines.rename(columns={'name': 'doctrine_name', 'id': 'doctrine_id'})
+    doctrines.drop('type_name', inplace=True, axis=1)
+    short_df = short_df.merge(doctrines, on='doctrine_name', how='left')
+    new_cols = ['type_id', 'type_name', 'quantity',
+                'volume_remain', 'price', 'fits_on_market', 'delta', 'fit_id', 'doctrine_name', 'doctrine_id',
+                'ship_type_id']
+    short_df = short_df[new_cols]
+
     print(f"""
         Retrieved Data for Doctrine Fits
         --------------------------------
@@ -358,13 +367,19 @@ def check_doctrine_status(target: int = 20):
         {short_items[0:len(short_items) - 1]}  
         """
           )
+    sql_handler.update_short_items(short_df)
+    google_sheet_updater.google_sheet_updater_short()
     short_df.to_csv("output/latest/short_doctrines.csv", index=False)
     target_df.to_csv("output/latest/target_doctrines.csv", index=False)
     summary_df.to_csv("output/latest/summary_doctrines.csv", index=False)
     print("Completed doctrines check")
 
+    return short_df, target_df, summary_df
+
 def short_doctrines_item_list(short_df: pd.DataFrame) -> pd.DataFrame:
     short_items = short_df.copy()
+    doctrines = doctrine_monitor.get_doctrine_fits()
+
     print(short_items.columns)
     return short_items
 
@@ -402,7 +417,7 @@ def save_data(history: DataFrame, vale_jita: DataFrame, final_data: DataFrame, f
 
     final_data.to_csv(market_stats_filename, index=False)
     status = sql_handler.update_stats(final_data)
-
+    google_sheet_updater.google_sheet_updater(final_data)
     # save a copy of market stats to update spreadsheet consistently named
     src_folder = r"output"
     latest_folder = os.path.join(src_folder, "latest")
@@ -425,7 +440,7 @@ if __name__ == "__main__":
     # Main function where everything gets executed.
 
     # Update full market history with fresh data?
-    fresh_data_choice = False
+    fresh_data_choice = True
 
     start_time = datetime.now()
     logger.info(f"starting program: {start_time}")
