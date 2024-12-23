@@ -416,7 +416,7 @@ def save_data(history: DataFrame, vale_jita: DataFrame, final_data: DataFrame, f
 
     final_data.to_csv(market_stats_filename, index=False)
     status = sql_handler.update_stats(final_data)
-    google_sheet_updater.google_sheet_updater(final_data)
+    google_sheet_updater.google_sheet_updater()
     # save a copy of market stats to update spreadsheet consistently named
     src_folder = r"output"
     latest_folder = os.path.join(src_folder, "latest")

@@ -76,7 +76,6 @@ class MarketOrder(Base):
     is_buy_order: Mapped[bool] = mapped_column(Boolean)
     timestamp: Mapped[datetime] = mapped_column(DateTime)
 
-
 class MarketHistory(Base):
     __tablename__ = "market_history"
     date: Mapped[datetime] = mapped_column(DateTime)
@@ -95,12 +94,11 @@ class MarketHistory(Base):
 class MarketStats(Base):
     __tablename__ = "Market_Stats"
     type_id: Mapped[str] = mapped_column(String(10), primary_key=True)
-    total_volume_remain: Mapped[int] = mapped_column(Integer)
-    min_price: Mapped[float] = mapped_column(Float)
-    price_5th_percentile: Mapped[float] = mapped_column(Float)
-    avg_of_avg_price: Mapped[float] = mapped_column(Float)
+    total_volume_remain: Mapped[int] = mapped_column(Integer, nullable=True)
+    min_price: Mapped[float] = mapped_column(Float, nullable=True)
+    price_5th_percentile: Mapped[float] = mapped_column(Float, nullable=True)
     avg_of_avg_price: Mapped[float] = mapped_column(Float, nullable=True)
-    avg_daily_volume: Mapped[float] = mapped_column(Float)
+    avg_daily_volume: Mapped[float] = mapped_column(Float, nullable=True)
     group_id: Mapped[str] = mapped_column(String(10))
     type_name: Mapped[Optional[str]] = mapped_column(String(100))
     group_name: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
@@ -145,7 +143,7 @@ class ShortItems(Base):
     __tablename__ = "ShortItems"
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     fit_id: Mapped[int] = mapped_column(Integer)
-    doctrine_name: Mapped[str] = mapped_column(String(100))
+    doctrine_name: Mapped[str] = mapped_column(String(100), nullable=True)
     type_id: Mapped[int] = mapped_column(Integer)
     type_name: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     quantity: Mapped[int] = mapped_column(Integer, nullable=True)
