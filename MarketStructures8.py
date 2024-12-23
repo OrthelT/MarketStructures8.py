@@ -358,6 +358,7 @@ def check_doctrine_status(target: int = 20):
     sql_handler.update_short_items(cleaned_short_df)
     sql_handler.update_doctrine_items(cleaned_target_df)
     google_sheet_updater.google_sheet_updater_short()
+    google_sheet_updater.google_sheet_updater_doctrine_items()
     cleaned_short_df.to_csv("output/latest/short_doctrines.csv", index=False)
     cleaned_target_df.to_csv("output/latest/target_doctrines.csv", index=False)
     summary_df.to_csv("output/latest/summary_doctrines.csv", index=False)

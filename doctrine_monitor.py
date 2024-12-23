@@ -1,7 +1,7 @@
 
 import pandas as pd
 import sqlalchemy
-from sqlalchemy import exc
+from sqlalchemy import exc, Engine, engine, create_engine
 
 from db_handler import read_market_orders
 
@@ -185,17 +185,20 @@ def read_doctrine_watchlist(db_name: str = 'wc_fitting') -> list:
 
 
 def clean_doctrine_columns(df: pd.DataFrame) -> pd.DataFrame:
+    print(df.columns)
+    # df = df.drop(columns=["doctrine_id", "ship_type_id"])
     doctrines = get_doctrine_fits()
     doctrines = doctrines.rename(columns={'name': 'doctrine_name', 'id': 'doctrine_id'})
     doctrines.drop('type_name', inplace=True, axis=1)
 
-    df = df.merge(doctrines, on='doctrine_name', how='left')
+    merged_df = df.merge(doctrines, on='doctrine_name', how='left')
+    print(merged_df.head())
 
     new_cols = ['type_id', 'type_name', 'quantity',
                 'volume_remain', 'price', 'fits_on_market', 'delta', 'fit_id', 'doctrine_name', 'doctrine_id',
                 'ship_type_id']
-    df = df[new_cols]
-    return df
+    updated_merged_df = merged_df[new_cols]
+    return updated_merged_df
 
 if __name__ == "__main__":
     pass

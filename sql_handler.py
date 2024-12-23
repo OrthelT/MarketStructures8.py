@@ -337,7 +337,7 @@ def process_esi_market_order(data: list, is_history: Boolean = False) -> str:
     return status
 
 def read_history(doys: int = 30) -> pd.DataFrame:
-    engine = create_engine(f"sqlite:///{sql_file}", echo=True)
+    engine = create_engine(f"sqlite:///{sql_file}", echo=False)
     # Create a session factory
     session = engine.connect()
     print(f'connection established: {session} by sql_handler.read_history()')
@@ -484,6 +484,9 @@ def update_short_items(df: pd.DataFrame) -> str:
                         price=record["price"],
                         fits_on_market=record["fits_on_market"],
                         delta=record["delta"],
+                        doctrine_id=record["doctrine_id"],
+                        ship_type_id=record["ship_type_id"],
+                        timestamp=record["timestamp"]
 
                     )
 
@@ -504,12 +507,22 @@ def update_short_items(df: pd.DataFrame) -> str:
     return "Short items loading completed successfully!"
 
 def read_short_items() -> pd.DataFrame:
-    engine = create_engine(f"sqlite:///{sql_file}", echo=True)
+    engine = create_engine(f"sqlite:///{sql_file}", echo=False)
     df = pd.read_sql_query("SELECT * FROM ShortItems", engine)
     engine.dispose()
     print(f'connection closed: {engine}...returning orders from ShortItems table.')
 
     return df
+
+
+def read_doctrine_items() -> pd.DataFrame:
+    engine = create_engine(f"sqlite:///{sql_file}", echo=False)
+    df = pd.read_sql_query("SELECT * FROM Doctrine_Items", engine)
+    engine.dispose()
+    print(f'connection closed: {engine}...returning orders from ShortItems table.')
+
+    return df
+
 
 def create_joined_invtypes_table():
     logger.info("Creating joined_invtypes table...")
@@ -518,7 +531,7 @@ def create_joined_invtypes_table():
     mysql_uri = f"mysql+pymysql://{fit_sqlfile}"
 
     # Create engines for both databases
-    sqlite_engine = create_engine(sqlite_uri, echo=True)
+    sqlite_engine = create_engine(sqlite_uri, echo=False)
     mysql_engine = create_engine(mysql_uri, echo=False)
 
     # Reflect the SQLite database schema
@@ -604,7 +617,7 @@ def get_missing_icons():
     mysql_uri = f"mysql+pymysql://{fit_sqlfile}"
     SDE_uri = f"sqlite:///{SDEsql}"
 
-    engine = create_engine(SDE_uri, echo=True)
+    engine = create_engine(SDE_uri, echo=False)
     con = engine.connect()
     df = pd.read_sql_query("""
        SELECT j.typeID, j.iconID, i.categoryID FROM Joined_InvTypes j
@@ -650,7 +663,9 @@ def update_doctrine_items(df: pd.DataFrame) -> str:
                         price=record["price"],
                         fits_on_market=record["fits_on_market"],
                         delta=record["delta"],
-
+                        doctrine_id=record["doctrine_id"],
+                        ship_type_id=record["ship_type_id"],
+                        timestamp=record["timestamp"]
                     )
 
                     for record in batch
@@ -671,9 +686,3 @@ def update_doctrine_items(df: pd.DataFrame) -> str:
 
 if __name__ == "__main__":
     pass
-
-    #
-    # engine = create_engine(f"sqlite:///{mkt_sqlfile}", echo=False)
-    # inspector = inspect(engine)
-    # tables = inspector.get_table_names()
-    # print(tables)
