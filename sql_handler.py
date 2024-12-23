@@ -685,4 +685,4 @@ def update_doctrine_items(df: pd.DataFrame) -> str:
     return "Doctrine items loading completed successfully!"
 
 if __name__ == "__main__":
-    pass
+    dashfits = 'data/fits_for_dashboard.csv'
