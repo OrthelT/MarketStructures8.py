@@ -443,6 +443,7 @@ if __name__ == "__main__":
 
     start_time = datetime.now()
     logger.info(f"starting program: {start_time}")
+
     # retrieve current watchlist from database
     logger.info(f"reading watchlist from database")
     watchlist = dbhandler.read_watchlist()
@@ -455,28 +456,35 @@ if __name__ == "__main__":
     market_orders = fetch_market_orders()
     # ==========================================
 
-    # ============================
+    # check doctrine market status
+    print("DOCTRINE CHECKS")
+    logger.info('Checking doctrines')
+    # =========================================
     check_doctrine_status()
-    # ===========================
+    # =========================================
+
     # update history data
+    print("HISTORY CHECKS")
     logger.info("updating history data")
     # =============================================
     historical_df = fetch_market_history(fresh_data_choice)
     # ==============================================
 
-    print(f"""
-    Market Orders: {type(market_orders)}
-    History Data: {type(historical_df)}
-    Watchlist: {type(watchlist)}
-    """)
-
+    #process market orders
     print('processing orders')
+    logger.info("processing orders")
     vale_jita, final_data = process_orders(market_orders, historical_df)
     save_data(historical_df, vale_jita, final_data, fresh_data_choice)
 
     # Completed stats
     finish_time = datetime.now()
     total_time = finish_time - start_time
+    logging.info(f"""
+    start time: {start_time}
+    finish time: {finish_time}
+    ---------------------------
+    total time: {total_time}
+    """)
 
     print("===================================================")
     print("ESI Request Completed Successfully.")
