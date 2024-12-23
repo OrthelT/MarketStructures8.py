@@ -13,8 +13,7 @@ from sqlalchemy import (
     Boolean,
     PrimaryKeyConstraint,
     text,
-    Table, MetaData, Column,
-
+    Table, MetaData, Column, inspect,
 
 )
 from sqlalchemy.orm import DeclarativeBase, declarative_base, mapped_column, sessionmaker, foreign, Mapped
@@ -24,7 +23,6 @@ import logging
 
 logger = logging.getLogger(__name__)
 logging.basicConfig()
-logging.getLogger("sqlalchemy.engine").setLevel(logging.INFO)
 
 sql_file = "market_orders.sqlite"
 mkt_sqlfile = "market_orders.sqlite"
