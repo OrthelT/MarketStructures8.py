@@ -409,7 +409,6 @@ def save_data(history: DataFrame, vale_jita: DataFrame, final_data: DataFrame, f
             "average",
             "order_count",
             "volume",
-            "last_updated",
         ]
         history = history[new_columns]
         history[update_time] = update_time

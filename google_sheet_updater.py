@@ -118,5 +118,28 @@ def google_sheet_updater_short() -> str:
     return message
 
 
+def gsheet_image_updater(df: pd.DataFrame):
+    gc = get_credentials(SCOPES)
+    df = df.copy()  # Work on a copy to avoid modifying the original DataFrame
+    # Convert DataFrame to a list of lists (Google Sheets format)
+    data_list = [df.columns.tolist()] + df.astype(str).values.tolist()
+    wb = gc.open("4H Market Status")
+    sheet = wb.worksheet("URLs")
+    try:
+        # Clear the existing content in the sheet
+        sheet.clear()
+
+        # Update the sheet with new data, starting at cell A1
+        result = sheet.update('A1', data_list)
+        print(result)
+        message = "image data updated successfully!"
+    except Exception as e:
+        # Handle errors gracefully
+        message = f"An error occurred while updating short items: {str(e)}"
+        print(message)
+        raise
+
+    return message
+
 if __name__ == "__main__":
     pass
