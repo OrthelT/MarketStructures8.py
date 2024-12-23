@@ -395,39 +395,39 @@ def update_stats(df: pd.DataFrame) -> str:
 
     with Session() as session:  # Corrected the session instantiation
         try:
-        # Clear the table
-        session.query(MarketStats).delete()
-        session.commit()
-        print("Table cleared")
-
-        # Insert new records
-        batch_size = 1000
-        for i in range(0, len(records), batch_size):
-            batch = records[i:i + batch_size]
-            stats_objects = [
-                MarketStats(
-                    type_id=record["type_id"],
-                    total_volume_remain=record["total_volume_remain"],
-                    min_price=record["min_price"],
-                    price_5th_percentile=record["price_5th_percentile"],
-                    avg_of_avg_price=record["avg_of_avg_price"],
-                    avg_daily_volume=record["avg_daily_volume"],
-                    group_id=record["group_id"],
-                    type_name=record["type_name"],
-                    group_name=record["group_name"],
-                    category_id=record["category_id"],
-                    category_name=record["category_name"],
-                    days_remaining=record["days_remaining"],
-                    timestamp=record["timestamp"],
-                )
-                for record in batch
-            ]
-            session.add_all(stats_objects)
+            # Clear the table
+            session.query(MarketStats).delete()
             session.commit()
-            print(
-                f"\rProcessed records {i} to {min(i + batch_size, len(records))}",
-                end="",
-            )
+            print("Table cleared")
+
+            # Insert new records
+            batch_size = 1000
+            for i in range(0, len(records), batch_size):
+                batch = records[i:i + batch_size]
+                stats_objects = [
+                    MarketStats(
+                        type_id=record["type_id"],
+                        total_volume_remain=record["total_volume_remain"],
+                        min_price=record["min_price"],
+                        price_5th_percentile=record["price_5th_percentile"],
+                        avg_of_avg_price=record["avg_of_avg_price"],
+                        avg_daily_volume=record["avg_daily_volume"],
+                        group_id=record["group_id"],
+                        type_name=record["type_name"],
+                        group_name=record["group_name"],
+                        category_id=record["category_id"],
+                        category_name=record["category_name"],
+                        days_remaining=record["days_remaining"],
+                        timestamp=record["timestamp"],
+                    )
+                    for record in batch
+                ]
+                session.add_all(stats_objects)
+                session.commit()
+                print(
+                    f"\rProcessed records {i} to {min(i + batch_size, len(records))}",
+                    end="",
+                )
 
         except Exception as e:
             session.rollback()
