@@ -20,6 +20,7 @@ from sqlalchemy.orm import DeclarativeBase, declarative_base, mapped_column, ses
 import pymysql
 import sqlite3
 import logging
+from doctrine_monitor import clean_doctrine_columns
 
 logger = logging.getLogger(__name__)
 logging.basicConfig()
@@ -155,6 +156,23 @@ class ShortItems(Base):
     ship_type_id: Mapped[int] = mapped_column(Integer, nullable=True)
     timestamp: Mapped[datetime] = mapped_column(DateTime, nullable=True)
 
+
+class Doctrine_Items(Base):
+    __tablename__ = "Doctrine_Items"
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    fit_id: Mapped[int] = mapped_column(Integer)
+    doctrine_name: Mapped[str] = mapped_column(String(100), nullable=True)
+    type_id: Mapped[int] = mapped_column(Integer)
+    type_name: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    quantity: Mapped[int] = mapped_column(Integer, nullable=True)
+    volume_remain: Mapped[float] = mapped_column(Float, nullable=True)
+    price: Mapped[float] = mapped_column(Float, nullable=True)
+    fits_on_market: Mapped[int] = mapped_column(Integer, nullable=True)
+    delta: Mapped[float] = mapped_column(Float, nullable=True)
+    doctrine_id: Mapped[int] = mapped_column(Integer, nullable=True)
+    ship_type_id: Mapped[int] = mapped_column(Integer, nullable=True)
+    timestamp: Mapped[datetime] = mapped_column(DateTime, nullable=True)
+
 def create_session():
     engine = create_engine(f"sqlite:///{sql_file}", echo=False)
     Session = sessionmaker(bind=engine)
@@ -206,7 +224,6 @@ def insert_timestamp(df: pl.DataFrame) -> pl.DataFrame:
     df = df.with_columns(
         pl.lit(ts).alias("timestamp"),
     )
-    print(df)
     return df
 
 def initialize_database(engine, base):
@@ -599,5 +616,64 @@ def get_missing_icons():
     con.close()
     print(len(df))
 
+
+def update_doctrine_items(df: pd.DataFrame) -> str:
+    # process the df
+    df_pl = pl.from_pandas(df)
+    df_processed = insert_timestamp(df_pl)
+    df_pl.fill_null(0)
+    records = df_processed.to_dicts()
+    # start a session
+    engine = create_engine(f"sqlite:///market_orders.sqlite", echo=False)
+    Session = sessionmaker(bind=engine)
+
+    with Session() as session:  # Corrected the session instantiation
+        try:
+
+            # Clear the table
+            session.query(Doctrine_Items).delete()
+            session.commit()
+            print("Table cleared")
+
+            # Insert new records
+            batch_size = 1000
+            for i in range(0, len(records), batch_size):
+                batch = records[i:i + batch_size]
+                doctrine_objects = [
+                    Doctrine_Items(
+                        fit_id=record["fit_id"],
+                        doctrine_name=record["doctrine_name"],
+                        type_id=record["type_id"],
+                        type_name=record["type_name"],
+                        quantity=record["quantity"],
+                        volume_remain=record["volume_remain"],
+                        price=record["price"],
+                        fits_on_market=record["fits_on_market"],
+                        delta=record["delta"],
+
+                    )
+
+                    for record in batch
+                ]
+                session.add_all(doctrine_objects)
+                session.commit()
+
+                print(
+                    f"\rProcessed records {i} to {min(i + batch_size, len(records))}",
+                    end="",
+                )
+        except Exception as e:
+            session.rollback()
+            print(f"Error occurred: {str(e)}")
+            raise
+
+    return "Doctrine items loading completed successfully!"
+
 if __name__ == "__main__":
     pass
+
+    #
+    # engine = create_engine(f"sqlite:///{mkt_sqlfile}", echo=False)
+    # inspector = inspect(engine)
+    # tables = inspector.get_table_names()
+    # print(tables)

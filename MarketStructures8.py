@@ -344,16 +344,8 @@ def history_merge(history_data: pd.DataFrame) -> pd.DataFrame:
 
 def check_doctrine_status(target: int = 20):
     short_df, target_df, summary_df = get_doctrine_status(target=target)
-    short_items = short_doctrines_item_list(short_df)
-
-    doctrines = doctrine_monitor.get_doctrine_fits()
-    doctrines = doctrines.rename(columns={'name': 'doctrine_name', 'id': 'doctrine_id'})
-    doctrines.drop('type_name', inplace=True, axis=1)
-    short_df = short_df.merge(doctrines, on='doctrine_name', how='left')
-    new_cols = ['type_id', 'type_name', 'quantity',
-                'volume_remain', 'price', 'fits_on_market', 'delta', 'fit_id', 'doctrine_name', 'doctrine_id',
-                'ship_type_id']
-    short_df = short_df[new_cols]
+    cleaned_short_df = doctrine_monitor.clean_doctrine_columns(short_df)
+    cleaned_target_df = doctrine_monitor.clean_doctrine_columns(target_df)
 
     print(f"""
         Retrieved Data for Doctrine Fits
@@ -361,27 +353,17 @@ def check_doctrine_status(target: int = 20):
         Items in short supply:  {len(short_df['type_id'].unique())}
         Items in target supply: {len(target_df['type_id'].unique())}
         Analyzed fits for: {len(summary_df['fit_id'].unique())}
-
-        The following items are in short supply:
-        -----------------------------------------
-        {short_items[0:len(short_items) - 1]}  
         """
           )
-    sql_handler.update_short_items(short_df)
+    sql_handler.update_short_items(cleaned_short_df)
+    sql_handler.update_doctrine_items(cleaned_target_df)
     google_sheet_updater.google_sheet_updater_short()
-    short_df.to_csv("output/latest/short_doctrines.csv", index=False)
-    target_df.to_csv("output/latest/target_doctrines.csv", index=False)
+    cleaned_short_df.to_csv("output/latest/short_doctrines.csv", index=False)
+    cleaned_target_df.to_csv("output/latest/target_doctrines.csv", index=False)
     summary_df.to_csv("output/latest/summary_doctrines.csv", index=False)
     print("Completed doctrines check")
 
     return short_df, target_df, summary_df
-
-def short_doctrines_item_list(short_df: pd.DataFrame) -> pd.DataFrame:
-    short_items = short_df.copy()
-    doctrines = doctrine_monitor.get_doctrine_fits()
-
-    print(short_items.columns)
-    return short_items
 
 def process_orders(market_orders, history_data):
 

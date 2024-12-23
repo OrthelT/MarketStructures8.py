@@ -184,5 +184,18 @@ def read_doctrine_watchlist(db_name: str = 'wc_fitting') -> list:
             engine.dispose()
 
 
+def clean_doctrine_columns(df: pd.DataFrame) -> pd.DataFrame:
+    doctrines = get_doctrine_fits()
+    doctrines = doctrines.rename(columns={'name': 'doctrine_name', 'id': 'doctrine_id'})
+    doctrines.drop('type_name', inplace=True, axis=1)
+
+    df = df.merge(doctrines, on='doctrine_name', how='left')
+
+    new_cols = ['type_id', 'type_name', 'quantity',
+                'volume_remain', 'price', 'fits_on_market', 'delta', 'fit_id', 'doctrine_name', 'doctrine_id',
+                'ship_type_id']
+    df = df[new_cols]
+    return df
+
 if __name__ == "__main__":
     pass
