@@ -428,14 +428,14 @@ def update_stats(df: pd.DataFrame) -> str:
                 f"\rProcessed records {i} to {min(i + batch_size, len(records))}",
                 end="",
             )
+
         except Exception as e:
             session.rollback()
             print(f"Error occurred: {str(e)}")
             raise
         finally:
             session.close()
-
-    return "Data loading completed successfully!"
+            return "Stats loading completed successfully!"
 
 def update_short_items(df: pd.DataFrame) -> str:
     # process the df
@@ -490,7 +490,6 @@ def update_short_items(df: pd.DataFrame) -> str:
 
     return "Short items loading completed successfully!"
 
-
 def read_short_items() -> pd.DataFrame:
     engine = create_engine(f"sqlite:///{sql_file}", echo=True)
     df = pd.read_sql_query("SELECT * FROM ShortItems", engine)
@@ -498,7 +497,6 @@ def read_short_items() -> pd.DataFrame:
     print(f'connection closed: {engine}...returning orders from ShortItems table.')
 
     return df
-
 
 def create_joined_invtypes_table():
     logger.info("Creating joined_invtypes table...")
@@ -588,7 +586,6 @@ def create_joined_invtypes_table():
         sqlite_session.close()
         mysql_session.close()
 
-
 def get_missing_icons():
     SDEsql = '../ESI_Utilities/SDE/SDE sqlite-latest.sqlite'
     mysql_uri = f"mysql+pymysql://{fit_sqlfile}"
@@ -607,28 +604,4 @@ def get_missing_icons():
     print(len(df))
 
 if __name__ == "__main__":
-    SDEsql = '../ESI_Utilities/SDE/SDE sqlite-latest.sqlite'
-    mysql_uri = f"mysql+pymysql://{fit_sqlfile}"
-    SDE_uri = f"sqlite:///{SDEsql}"
-
-    engine = create_engine(SDE_uri, echo=True)
-    con = engine.connect()
-    msg = """
-    SELECT t.typeID, t.iconID, g.groupID, g.categoryID  FROM invGroups g
-    JOIN invTypes t ON t.groupID = g.groupId
-    where g.categoryID = 6
-    
-    """
-    df = pd.read_sql_query(msg, con)
-    df.to_csv("missing_icons.csv")
-
-    # df = pd.read_sql_query("""
-    #     SELECT j.typeID, j.iconID, j.groupID, i.categoryID FROM invTypes j
-    #     join invGroups i on j.groupID = i.groupId
-    #     WHERE i.categoryID = 6 AND j.iconID is NOT NULL
-    #
-    #     """, con)
-
-    con.close()
-    print(len(df))
-    print(df.head())
+    pass
