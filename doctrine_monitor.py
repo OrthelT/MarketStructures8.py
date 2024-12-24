@@ -6,7 +6,7 @@ from sqlalchemy import exc, Engine, engine, create_engine
 from db_handler import read_market_orders
 
 
-def get_doctrine_fits(db_name: str = 'wc_fitting'):
+def get_doctrine_fits(db_name: str = 'wc_fitting') -> pd.DataFrame:
     print('accessing_db')
     print('------------------------')
     mysql_connection = f"mysql+mysqlconnector://Orthel:Dawson007!27608@localhost:3306/{db_name}"
@@ -14,10 +14,11 @@ def get_doctrine_fits(db_name: str = 'wc_fitting'):
     print('MySql db connection established')
     print('accessing doctrines...')
     table_name = 'watch_doctrines'
-    query = f"SELECT id, name FROM {table_name}"
-    df = pd.read_sql_query(query, engine)
-    for row in range(len(df)):
-        print(df.loc[row, 'name'])
+
+    # query = f"SELECT id, name FROM {table_name}"
+    # df = pd.read_sql_query(query, engine)
+
+    df = pd.read_sql_table('watch_doctrines', engine)
 
     doctrine_ids = ", ".join(map(str, df['id'].tolist()))
 
@@ -102,6 +103,16 @@ def get_market_stats(doctrine_df: pd.DataFrame, orders: pd.DataFrame, target: in
     final_orders = aggregate_df.drop(columns=['order_id', 'issued', 'duration', 'is_buy_order', 'timestamp'])
     df = doctrine_df.merge(final_orders, on='type_id', how='left')
     return df
+
+
+def get_doctrine_status_optimized(target: int = 20) -> pd.DataFrame:
+    target_df = pd.DataFrame()
+    fits_df = get_doctrine_fits(db_name='wc_fitting')
+    fit_ids = fits_df['id'].tolist()
+
+    return get_doctrine_status(
+        target=target
+    )
 
 def get_doctrine_status(target: int = 20) -> pd.DataFrame:
     target_df = pd.DataFrame()
@@ -202,3 +213,6 @@ def clean_doctrine_columns(df: pd.DataFrame) -> pd.DataFrame:
 
 if __name__ == "__main__":
     pass
+
+    # query = f"SELECT id, name FROM {table_name}"
+    # df = pd.read_sql_query(query, engine)

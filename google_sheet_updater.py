@@ -1,3 +1,5 @@
+from logging import FileHandler
+
 import gspread
 from google.oauth2.service_account import Credentials
 import pandas as pd
@@ -7,11 +9,12 @@ import doctrine_monitor
 import sql_handler
 import logging
 import datetime
+from logging_tool import configure_logging
 
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
+logger = configure_logging(
+    "google_sheet_updater",
+    "logs/google_sheet_updater.log")
 logger.addHandler(logging.StreamHandler())
-logger.addHandler(logging.FileHandler("logs/gsheets_report.log"))
 
 SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets",
@@ -56,8 +59,10 @@ def google_sheet_updater() -> str:
         # Update the sheet with new data, starting at cell A1
         result = sheet.update(
             values=data_list, range_name='A1')
-        print(result)
         message = "Market Stats data updated successfully!"
+        logger.info(message)
+        logger.info(result)
+
     except Exception as e:
         message = f"An error occurred while updating MarketStats: {str(e)}"
         print(message)
@@ -68,7 +73,6 @@ def google_sheet_updater_short() -> str:
     # This function grabs items we have identified as being in short supply and posts to Google sheets.
     # Read data from the SQL handler
     df = sql_handler.read_short_items()
-    df['timestamp'] = str(datetime.datetime.now())
     new_cols = [
         'type_id', 'type_name', 'fits_on_market', 'quantity',
         'volume_remain', 'price',
@@ -88,7 +92,8 @@ def google_sheet_updater_short() -> str:
     sheet = wb.worksheet("ShortItems")
     try:
         # Clear the existing content in the sheet
-        sheet.clear()
+        clear = sheet.clear()
+        logger.info(clear)
         # Update the sheet with new data, starting at cell A1
         result = sheet.update(
             values=data_list, range_name='A1')
@@ -105,7 +110,7 @@ def google_sheet_updater_doctrine_items() -> str:
     # This function grabs items we have identified as being in short supply and posts to Google sheets.
     # Read data from the SQL handler
     df = sql_handler.read_doctrine_items()
-    df['timestamp'] = str(datetime.datetime.now())
+
     new_cols = [
         'type_id', 'type_name', 'fits_on_market', 'quantity',
         'volume_remain', 'price',
@@ -124,14 +129,17 @@ def google_sheet_updater_doctrine_items() -> str:
     sheet = wb.worksheet("DoctrineItems")
     try:
         # Clear the existing content in the sheet
-        sheet.clear()
+        clear = sheet.clear()
+        logger.info(clear)
         # Update the sheet with new data, starting at cell A1
         result = sheet.update(values=data_list, range_name='A1')
         print(result)
         message = "Doctrine items data updated successfully!"
+        logger.info(print(message, result))
     except Exception as e:
         message = f"An error occurred while updating doctrine items: {str(e)}"
         print(message)
+        logger.error(message)
         raise
     return message
 

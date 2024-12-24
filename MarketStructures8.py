@@ -17,7 +17,7 @@ from ESI_OAUTH_FLOW import get_token
 from file_cleanup import rename_move_and_archive_csv
 from get_jita_prices import get_jita_prices
 from logging_tool import configure_logging
-from sql_handler import process_esi_market_order, process_esi_market_order_optimized
+from sql_handler import process_esi_market_order_optimized
 from doctrine_monitor import read_doctrine_watchlist, read_market_orders, get_doctrine_status
 
 # GNU General Public License
@@ -250,6 +250,7 @@ def fetch_market_history(fresh_data: bool == True) -> pd.DataFrame:
     else:
         logging.info('retrieving cached market history data')
         historical_df = sql_handler.read_history(30)
+        all_history = None
 
     logging.info(f"history data complete. {len(historical_df)} records retrieved.")
     logging.info("returning history_df")
@@ -263,6 +264,7 @@ def aggregate_sell_orders(market_orders_json: any) -> pd.DataFrame:
     logging.info(f'market orders type:{type(market_orders_json)}')
 
     orders = pd.DataFrame(market_orders_json)
+
     ids = dbhandler.read_watchlist()
     ids = ids["type_id"].tolist()
 
@@ -330,7 +332,6 @@ def history_merge(history_data: pd.DataFrame) -> pd.DataFrame:
     ].round(2)
     logging.info("history data processed. returning grouped historical data")
     return grouped_historical_df
-
 
 def update_doctrine_status(target: int = 20):
     short_df, target_df, summary_df = get_doctrine_status(target=target)
@@ -412,7 +413,7 @@ if __name__ == "__main__":
     # Main function where everything gets executed.
 
     # Update full market history with fresh data?
-    fresh_data_choice = True
+    fresh_data_choice = False
 
     start_time = datetime.now()
     logger.info(f"starting program: {start_time}")
@@ -428,16 +429,10 @@ if __name__ == "__main__":
     # =========================================
     market_orders = fetch_market_orders()
     # ==========================================
+
     logger.info("saving to database...market orders")
     orders_status = process_esi_market_order_optimized(market_orders, False)
     logger.info(orders_status)
-
-    # check doctrine market status
-    print("DOCTRINE CHECKS")
-    logger.info('Checking doctrines')
-    # =========================================
-    update_doctrine_status()
-    # =========================================
 
     # update history data
     print("HISTORY CHECKS")
@@ -446,15 +441,23 @@ if __name__ == "__main__":
     historical_df, all_history = fetch_market_history(fresh_data_choice)
     # ==============================================
     # #save to database
-    logger.info(
-        f"done. successfully retrieved {len(all_history)}. connecting to database...")
-    history_status = process_esi_market_order_optimized(all_history, True)
-    logger.info(history_status)
+
+    if fresh_data_choice:
+        logger.info(
+            f"done. successfully retrieved {len(all_history)}. connecting to database...")
+        history_status = process_esi_market_order_optimized(all_history, True)
+        logger.info(history_status)
 
     #process market orders
     print('processing orders')
     logger.info("processing orders")
     vale_jita, final_data = process_orders(market_orders, historical_df)
+    # check doctrine market status
+    print("DOCTRINE CHECKS")
+    logger.info('Checking doctrines')
+    # =========================================
+    update_doctrine_status()
+    # =========================================
     save_data(historical_df, vale_jita, final_data, fresh_data_choice)
 
     # Completed stats

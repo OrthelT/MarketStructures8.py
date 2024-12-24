@@ -5,6 +5,7 @@ import pandas as pd
 from datetime import datetime, timezone
 from typing import Optional, List
 
+from prompt_toolkit import shortcuts
 from sqlalchemy import (
     create_engine,
     String,
@@ -15,12 +16,14 @@ from sqlalchemy import (
     PrimaryKeyConstraint,
     text,
     Table, MetaData, Column, inspect,
-
 )
 from sqlalchemy.orm import DeclarativeBase, declarative_base, mapped_column, sessionmaker, foreign, Mapped
 import pymysql
 import sqlite3
 import logging
+
+import db_handler
+from db_handler import read_market_stats
 from doctrine_monitor import clean_doctrine_columns
 from logging_tool import configure_logging
 
@@ -294,7 +297,6 @@ def process_esi_market_order(data: list, is_history: Boolean = False) -> str:
     df = pl.DataFrame(data)
 
     engine = create_engine(f"sqlite:///{sql_file}", echo=False)
-    initialize_database(engine, Base)
 
     if is_history:
         columns = history_columns
@@ -650,6 +652,25 @@ def update_short_items(df: pd.DataFrame) -> str:
 
     return "Short items loading completed successfully!"
 
+
+def update_short_items_optimized(df: pd.DataFrame) -> str:
+    # process the df
+    df_processed = insert_pd_timestamp(df)
+    status = "processed data"
+
+    # start a session
+    engine = create_engine(f"sqlite:///{sql_file}", echo=False)
+
+    with engine.connect():
+        try:
+            df_processed.to_sql('market_order', con=engine, if_exists='replace', index=False, chunksize=1000)
+            status += ", data loaded"
+        except Exception as e:
+            sql_logger.error(print(f'an exception occurred in df_processed.to_sql: {e}'))
+            raise
+
+    return f"{status} Short items loading completed successfully!"
+
 def read_short_items() -> pd.DataFrame:
     engine = create_engine(f"sqlite:///{sql_file}", echo=False)
     df = pd.read_sql_query("SELECT * FROM ShortItems", engine)
@@ -825,13 +846,11 @@ def update_doctrine_items(df: pd.DataFrame) -> str:
 
     return "Doctrine items loading completed successfully!"
 
-
 def optimize_for_bulk_update(engine):
     # Optimize database settings for bulk insert
     with engine.begin() as conn:
         conn.execute(text("PRAGMA synchronous = OFF;"))
         conn.execute(text("PRAGMA journal_mode = MEMORY;"))
-
 
 def revert_sqlite_settings(engine):
     # Revert SQLite to safer defaults
@@ -842,14 +861,4 @@ def revert_sqlite_settings(engine):
 
 
 if __name__ == "__main__":
-    with open('tests/mkt_orders_raw3.json', 'r') as f:
-        orders = json.load(f)
-
-    with open('tests/mkt_history_raw3.json', 'r') as f:
-        history = json.load(f)
-
-    status = process_esi_market_order_optimized(orders, False)
-    print(status)
-
-    status = process_esi_market_order_optimized(history, True)
-    print(status)
+    pass
