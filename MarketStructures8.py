@@ -17,7 +17,7 @@ from ESI_OAUTH_FLOW import get_token
 from file_cleanup import rename_move_and_archive_csv
 from get_jita_prices import get_jita_prices
 from logging_tool import configure_logging
-from sql_handler import process_esi_market_order
+from sql_handler import process_esi_market_order, process_esi_market_order_optimized
 from doctrine_monitor import read_doctrine_watchlist, read_market_orders, get_doctrine_status
 
 # GNU General Public License
@@ -38,7 +38,6 @@ structure_id = 1035466617946
 MARKET_STRUCTURE_URL = (
     f"https://esi.evetech.net/latest/markets/structures/{structure_id}/?page="
 )
-print(MARKET_STRUCTURE_URL)
 SCOPE = [
     "esi-markets.structure_markets.v1"
 ]  # make sure you have this scope enabled in you ESI Dev Application settings.
@@ -88,7 +87,7 @@ def fetch_market_orders():
     failed_pages = []
     failed_pages_count = 0
 
-    logging.info("fetching orders...")  # Track status
+    logger.info("fetching orders...")  # Track status
 
     while page <= max_pages:
         print(f"\rFetching page {page}...", end="")
@@ -114,7 +113,7 @@ def fetch_market_orders():
             error_code = response.status_code
             error_details = response.json()
             error = error_details["error"]
-            logging.error(
+            logger.error(
                 f"Error fetching data from page {page}. status code: {error_code}"
             )
             error_count += 1
@@ -136,7 +135,7 @@ def fetch_market_orders():
             try:
                 orders = response.json()
             except ValueError:
-                logging.error(f"Error decoding JSON response from page {page}.")
+                logger.error(f"Error decoding JSON response from page {page}.")
                 failed_pages.append([page, "ValueError", "ValueError"])
                 failed_pages_count += 1
                 continue
@@ -156,19 +155,15 @@ def fetch_market_orders():
     with open('output/latest/all_orders.json', 'w') as f:
         json.dumps(all_orders)
 
-    logging.info(
+    logger.info(
         f"done. successfully retrieved {len(all_orders)}. connecting to database...")
-    logging.info("saving to database...market orders")
-    df_status = process_esi_market_order(all_orders, False)
-    logging.info(df_status)
-    print('completed database update')
 
     print("""
     ---------------------
     Checking doctrines
     ----------------------
     """)
-
+    logger.info(f'returning all orders')
     return all_orders
 
 # update market history
@@ -249,23 +244,17 @@ def fetch_market_history(fresh_data: bool == True) -> pd.DataFrame:
                         continue
             page = 1
             max_pages = 1
-        # #save to database
-        logger.info(
-            f"done. successfully retrieved {len(all_history)}. connecting to database...")
 
-        df_status = process_esi_market_order(all_history, True)
-        logger.info(df_status)
         historical_df = pd.DataFrame(all_history)
 
     else:
-
         logging.info('retrieving cached market history data')
         historical_df = sql_handler.read_history(30)
 
     logging.info(f"history data complete. {len(historical_df)} records retrieved.")
     logging.info("returning history_df")
 
-    return historical_df
+    return historical_df, all_history
 # ===============================================
 # Functions: Process Market Stats
 # -----------------------------------------------
@@ -342,7 +331,8 @@ def history_merge(history_data: pd.DataFrame) -> pd.DataFrame:
     logging.info("history data processed. returning grouped historical data")
     return grouped_historical_df
 
-def check_doctrine_status(target: int = 20):
+
+def update_doctrine_status(target: int = 20):
     short_df, target_df, summary_df = get_doctrine_status(target=target)
     cleaned_short_df = doctrine_monitor.clean_doctrine_columns(short_df)
     cleaned_target_df = doctrine_monitor.clean_doctrine_columns(target_df)
@@ -438,20 +428,28 @@ if __name__ == "__main__":
     # =========================================
     market_orders = fetch_market_orders()
     # ==========================================
+    logger.info("saving to database...market orders")
+    orders_status = process_esi_market_order_optimized(market_orders, False)
+    logger.info(orders_status)
 
     # check doctrine market status
     print("DOCTRINE CHECKS")
     logger.info('Checking doctrines')
     # =========================================
-    check_doctrine_status()
+    update_doctrine_status()
     # =========================================
 
     # update history data
     print("HISTORY CHECKS")
     logger.info("updating history data")
     # =============================================
-    historical_df = fetch_market_history(fresh_data_choice)
+    historical_df, all_history = fetch_market_history(fresh_data_choice)
     # ==============================================
+    # #save to database
+    logger.info(
+        f"done. successfully retrieved {len(all_history)}. connecting to database...")
+    history_status = process_esi_market_order_optimized(all_history, True)
+    logger.info(history_status)
 
     #process market orders
     print('processing orders')

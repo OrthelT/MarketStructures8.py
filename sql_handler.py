@@ -1,8 +1,9 @@
+import json
 
 import polars as pl
 import pandas as pd
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Optional, List
 
 from sqlalchemy import (
     create_engine,
@@ -21,13 +22,16 @@ import pymysql
 import sqlite3
 import logging
 from doctrine_monitor import clean_doctrine_columns
+from logging_tool import configure_logging
 
-logger = logging.getLogger(__name__)
-logging.basicConfig()
+sql_logger = configure_logging(
+    "sql_logger",
+    "logs/sql_logger.log")
 
 sql_file = "market_orders.sqlite"
-mkt_sqlfile = "market_orders.sqlite"
+mkt_sqlfile = "sqlite:///market_orders.sqlite"
 fit_sqlfile = "Orthel:Dawson007!27608@localhost:3306/wc_fitting"
+fit_mysqlfile = "mysql+pymysql://Orthel:Dawson007!27608@localhost:3306/wc_fitting"
 
 Base = declarative_base()
 
@@ -40,6 +44,7 @@ market_columns = [
     "order_id",
     "is_buy_order",
 ]
+
 history_columns = [
     "date",
     "type_id",
@@ -200,8 +205,34 @@ def process_dataframe(
     df = insert_timestamp(df)
     return df
 
+
+def process_pd_dataframe(
+        df: pd.DataFrame, columns: list, date_column: str = None
+) -> pd.DataFrame:
+    """Process the dataframe by selecting columns and converting dates."""
+    # Select only the specified columns
+    df = df[columns]
+
+    # Determine the date column if not provided
+    if date_column is None:
+        if "date" in df.columns:
+            date_column = "date"
+        elif "issued" in df.columns:
+            date_column = "issued"
+        else:
+            date_column = None
+
+    # Convert date strings to datetime objects
+    if date_column:
+        df[date_column] = pd.to_datetime(df[date_column], errors='coerce')
+
+    # Insert timestamp
+    df = insert_pd_timestamp(df)
+
+    return df
+
 def insert_type_names(df: pl.DataFrame) -> pl.DataFrame:
-    engine = create_engine(f"sqlite:///{sql_file}", echo=False)
+    engine = create_engine(mkt_sqlfile, echo=False)
 
     match_type_ids = """
        SELECT typeID, typeName FROM JoinedInvTypes
@@ -219,11 +250,39 @@ def insert_type_names(df: pl.DataFrame) -> pl.DataFrame:
     )
     return df_named
 
+
+def insert_pd_type_names(df: pd.DataFrame) -> pd.DataFrame:
+    engine = create_engine(mkt_sqlfile, echo=False)
+
+    match_type_ids = """
+       SELECT typeID, typeName FROM JoinedInvTypes
+       """
+
+    with engine.connect() as conn:
+        result = conn.execute(text(match_type_ids))
+        type_mappings = result.fetchall()
+        sql_logger.info(print(type_mappings[:10]))
+        sql_logger.info(print(f'type: {type(type_mappings)}'))
+
+    names = pd.DataFrame(type_mappings, columns=['type_id', 'type_name'])
+    sql_logger.info(print(names))
+
+    df2 = df.copy()
+    df2 = df2.merge(names, on='type_id', how='left')
+
+    return df2
+
 def insert_timestamp(df: pl.DataFrame) -> pl.DataFrame:
     ts = datetime.now(timezone.utc)
     df = df.with_columns(
         pl.lit(ts).alias("timestamp"),
     )
+    return df
+
+
+def insert_pd_timestamp(df: pd.DataFrame) -> pd.DataFrame:
+    ts = datetime.now(timezone.utc)
+    df["timestamp"] = ts
     return df
 
 def initialize_database(engine, base):
@@ -232,6 +291,8 @@ def initialize_database(engine, base):
     pass
 
 def process_esi_market_order(data: list, is_history: Boolean = False) -> str:
+    df = pl.DataFrame(data)
+
     engine = create_engine(f"sqlite:///{sql_file}", echo=False)
     initialize_database(engine, Base)
 
@@ -300,7 +361,6 @@ def process_esi_market_order(data: list, is_history: Boolean = False) -> str:
 
         order_class = "market"
 
-    df = pl.DataFrame(data)
     df_processed = process_dataframe(df, columns)
 
     records = df_processed.to_dicts()
@@ -336,9 +396,93 @@ def process_esi_market_order(data: list, is_history: Boolean = False) -> str:
 
     return status
 
+
+def process_esi_market_order_optimized(data: List[dict], is_history: bool = False) -> str:
+    # Create a DataFrame from the list of dictionaries
+    df = pd.DataFrame(data)
+    # Database setup
+    if is_history:
+
+        try:
+            status = update_history(df)
+            # Bulk insert using Pandas
+        except Exception as e:
+            print(f"Error updating history data: {str(e)}")
+            raise
+
+    # Skip type name update and current order update if history is True
+    else:
+        try:
+            status = update_orders(df)
+        except Exception as e:
+            print(f"Error updating ordrs: {str(e)}")
+
+    return f"{status} Doctrine items loading completed successfully!"
+
+
+def update_history(df: pd.DataFrame) -> str:
+    engine = create_engine(mkt_sqlfile, echo=False)
+
+    optimize_for_bulk_update(engine)
+
+    with engine.connect() as con:
+        try:
+            df_processed = process_pd_dataframe(df, history_columns)
+            status = "data processed"
+        except Exception as e:
+            sql_logger.error(print(f'an exception occurred in process_pd_dataframe(df, history_columns): {e}'))
+            raise
+        try:
+            df_named = insert_pd_type_names(df_processed)
+            status += ", type names updated"
+        except Exception as e:
+            sql_logger.error(print(f'an exception occurred in insert_pd_type_names(df_processed): {e}'))
+            raise
+        try:
+            df_named.to_sql('market_history', con=engine, if_exists='replace', index=False, chunksize=1000)
+            status += ", data loaded"
+        except Exception as e:
+            sql_logger.error(print(f'an exception occurred in df_processed.to_sql: {e}'))
+            raise
+
+    revert_sqlite_settings(engine)
+
+    return status
+
+
+def update_orders(df: pd.DataFrame) -> str:
+    engine = create_engine(mkt_sqlfile, echo=False)
+
+    optimize_for_bulk_update(engine)
+
+    with engine.connect() as con:
+        try:
+            df_processed = process_pd_dataframe(df, market_columns)
+            status = "data processed"
+        except Exception as e:
+            sql_logger.error(print(f'an exception occurred in process_pd_dataframe(df, history_columns): {e}'))
+            raise
+        try:
+            df_named = insert_pd_type_names(df_processed)
+            status += ", type names updated"
+        except Exception as e:
+            sql_logger.error(print(f'an exception occurred in insert_pd_type_names(df_processed): {e}'))
+            raise
+        try:
+            df_named.to_sql('market_order', con=engine, if_exists='replace', index=False, chunksize=1000)
+            status += ", data loaded"
+        except Exception as e:
+            sql_logger.error(print(f'an exception occurred in df_processed.to_sql: {e}'))
+            raise
+
+    revert_sqlite_settings(engine)
+
+    return status
+
 def read_history(doys: int = 30) -> pd.DataFrame:
-    engine = create_engine(f"sqlite:///{sql_file}", echo=False)
-    # Create a session factory
+    engine = create_engine(mkt_sqlfile, echo=False)
+
+    # Create a session factoryf
     session = engine.connect()
     print(f'connection established: {session} by sql_handler.read_history()')
     d = f"'-{doys} days'"
@@ -514,7 +658,6 @@ def read_short_items() -> pd.DataFrame:
 
     return df
 
-
 def read_doctrine_items() -> pd.DataFrame:
     engine = create_engine(f"sqlite:///{sql_file}", echo=False)
     df = pd.read_sql_query("SELECT * FROM Doctrine_Items", engine)
@@ -522,7 +665,6 @@ def read_doctrine_items() -> pd.DataFrame:
     print(f'connection closed: {engine}...returning orders from ShortItems table.')
 
     return df
-
 
 def create_joined_invtypes_table():
     logger.info("Creating joined_invtypes table...")
@@ -629,7 +771,6 @@ def get_missing_icons():
     con.close()
     print(len(df))
 
-
 def update_doctrine_items(df: pd.DataFrame) -> str:
     # process the df
     df_pl = pl.from_pandas(df)
@@ -684,5 +825,31 @@ def update_doctrine_items(df: pd.DataFrame) -> str:
 
     return "Doctrine items loading completed successfully!"
 
+
+def optimize_for_bulk_update(engine):
+    # Optimize database settings for bulk insert
+    with engine.begin() as conn:
+        conn.execute(text("PRAGMA synchronous = OFF;"))
+        conn.execute(text("PRAGMA journal_mode = MEMORY;"))
+
+
+def revert_sqlite_settings(engine):
+    # Revert SQLite to safer defaults
+    with engine.begin() as conn:
+        conn.execute(text("PRAGMA synchronous = FULL;"))
+        conn.execute(text("PRAGMA journal_mode = DELETE;"))
+
+
+
 if __name__ == "__main__":
-    dashfits = 'data/fits_for_dashboard.csv'
+    with open('tests/mkt_orders_raw3.json', 'r') as f:
+        orders = json.load(f)
+
+    with open('tests/mkt_history_raw3.json', 'r') as f:
+        history = json.load(f)
+
+    status = process_esi_market_order_optimized(orders, False)
+    print(status)
+
+    status = process_esi_market_order_optimized(history, True)
+    print(status)
