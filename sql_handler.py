@@ -235,7 +235,6 @@ def insert_type_names(df: pl.DataFrame) -> pl.DataFrame:
     )
     return df_named
 
-
 def insert_pd_type_names(df: pd.DataFrame) -> pd.DataFrame:
     engine = create_engine(mkt_sqlfile, echo=False)
 
@@ -269,116 +268,6 @@ def insert_pd_timestamp(df: pd.DataFrame) -> pd.DataFrame:
     ts = datetime.now(timezone.utc)
     df.loc[:, "timestamp"] = ts
     return df
-
-def initialize_database(engine, base):
-    # # """Create all database tables."""
-    # base.metadata.create_all(engine)
-    pass
-
-def process_esi_market_order(data: list, is_history: Boolean = False) -> str:
-    df = pl.DataFrame(data)
-
-    engine = create_engine(f"sqlite:///{sql_file}", echo=False)
-
-    if is_history:
-        columns = history_columns
-        order_class = "history"
-        # update history data
-        stmt = """
-        INSERT INTO market_history 
-            (date, type_id, average, volume, highest, lowest, order_count, timestamp)
-        VALUES 
-            (:date, :type_id, :average, :volume, :highest, :lowest, :order_count, :timestamp)
-        ON CONFLICT(date, type_id) DO UPDATE SET
-            average = EXCLUDED.average,
-            volume = EXCLUDED.volume,
-            highest = EXCLUDED.highest,
-            lowest = EXCLUDED.lowest,
-            order_count = EXCLUDED.order_count,
-            timestamp = EXCLUDED.timestamp
-        """
-        # Fill in type names
-        stmt2 = """
-        UPDATE market_history
-        SET type_name = (
-            select jt.typeName
-            from JoinedInvTypes as jt
-            where market_history.type_id = jt.typeID
-            )
-        WHERE type_name is NULL
-          AND EXISTS(
-          SELECT 1
-          FROM JoinedInvTypes as jt
-          WHERE jt.typeID = market_history.type_id
-          );"""
-
-    else:
-        # update market orders
-        columns = market_columns
-        stmt = """
-        INSERT INTO market_order 
-            (order_id, type_id, volume_remain, price, issued, duration, is_buy_order, timestamp)
-        VALUES 
-            (:order_id, :type_id, :volume_remain, :price, :issued, :duration, :is_buy_order, :timestamp)
-        ON CONFLICT(order_id) DO UPDATE SET
-            volume_remain = EXCLUDED.volume_remain,
-            price = EXCLUDED.price,
-            issued = EXCLUDED.issued,
-            duration = EXCLUDED.duration,
-            is_buy_order = EXCLUDED.is_buy_order,
-            timestamp = EXCLUDED.timestamp
-        """
-        # Fill in type_names
-        stmt2 = """
-        UPDATE market_order
-        SET type_name = (select jt.typeName
-                         from JoinedInvTypes as jt
-                         where market_order.type_id = jt.typeID
-        )
-        WHERE type_name is NULL
-        AND EXISTS(
-            SELECT 1
-            FROM JoinedInvTypes as jt
-            WHERE jt.typeID = market_order.type_id
-
-        );"""
-
-        order_class = "market"
-
-    df_processed = process_dataframe(df, columns)
-
-    records = df_processed.to_dicts()
-
-    batch_size = 1000
-    status = "failed"
-
-    with engine.begin() as conn:
-        try:
-            for i in range(0, len(records), batch_size):
-                batch = records[i: i + batch_size]
-                conn.execute(text(stmt), batch)
-                print(
-                    f"\rProcessed records {i} to {min(i + batch_size, len(records))}",
-                    end="",
-                )
-            status = "Data loading completed successfully!"
-        except Exception as e:
-            print(f"Error inserting data: {str(e)}")
-            raise
-
-        try:
-            conn.execute(text(stmt2))
-        except Exception as e:
-            print(f"Error filling in type names: {str(e)}")
-
-    if order_class == "market":
-        try:
-            status = update_current_orders(df_processed)
-        except Exception as e:
-            print(f"Error updating current orders: {str(e)}")
-            raise
-
-    return status
 
 def process_esi_market_order_optimized(data: List[dict], is_history: bool = False) -> str:
     # Create a DataFrame from the list of dictionaries
