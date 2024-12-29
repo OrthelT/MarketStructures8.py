@@ -264,8 +264,8 @@ def insert_timestamp(df: pl.DataFrame) -> pl.DataFrame:
     )
     return df
 
-
 def insert_pd_timestamp(df: pd.DataFrame) -> pd.DataFrame:
+    df = df.copy()
     ts = datetime.now(timezone.utc)
     df.loc[:, "timestamp"] = ts
     return df
