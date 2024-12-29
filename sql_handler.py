@@ -666,7 +666,7 @@ def read_doctrine_items() -> pd.DataFrame:
     return df
 
 def create_joined_invtypes_table():
-    logger.info("Creating joined_invtypes table...")
+    sql_logger.info("Creating joined_invtypes table...")
     # Define SQLite and MySQL database URIs
     sqlite_uri = f"sqlite:///{mkt_sqlfile}"
     mysql_uri = f"mysql+pymysql://{fit_sqlfile}"
