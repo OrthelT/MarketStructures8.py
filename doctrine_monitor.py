@@ -1,9 +1,7 @@
 
 import pandas as pd
 import sqlalchemy
-from altair import to_csv
-from sqlalchemy import exc, Engine, engine, create_engine
-from tornado.gen import Return
+from sqlalchemy import exc, create_engine
 
 mkt_sqlfile = "sqlite:///market_orders.sqlite"
 fit_mysqlfile = "mysql+pymysql://Orthel:Dawson007!27608@localhost:3306/wc_fitting"
@@ -52,7 +50,6 @@ def get_doctrine_fits(db_name: str = 'wc_fitting') -> pd.DataFrame:
         df = pd.read_sql_query(query3, engine)
     return df
 
-
 def get_fit_items(df: pd.DataFrame, id_list: list):
     cols = ['id', 'name', 'ship_type_id', 'type_name']
     df = df.rename({'id': 'fit_id', 'name': 'doctrine_name'}, axis="columns")
@@ -99,27 +96,6 @@ def get_fit_items(df: pd.DataFrame, id_list: list):
     fit_items = df4[['type_id', 'type_name', 'quantity', 'doctrine_name', 'ship_type_name', 'ship_type_id', 'fit_id', ]]
     return fit_items
 
-
-# def get_market_stats(doctrine_df: pd.DataFrame, orders: pd.DataFrame, target: int = 20) -> pd.DataFrame:
-#     # Convert orders type_id to integer
-#     orders['type_id'] = pd.to_numeric(orders['type_id'])
-#     # process orders and evaluate marget status
-#     doctrine_orders = orders[orders['type_id'].isin(doctrine_df['type_id'])]
-#     most_recent = doctrine_orders['timestamp'].max()
-#     doctrine_orders = doctrine_orders[doctrine_orders['timestamp'] == most_recent]
-#     doctrine_orders.reset_index(drop=True, inplace=True)
-#     aggregate_df = doctrine_orders.groupby('type_id').sum()
-#     aggregate_df.reset_index(inplace=True)
-#     print(aggregate_df.head())
-#     print(aggregate_df.columns)
-#     print(doctrine_df.head())
-#     print(doctrine_df.columns)
-#     final_orders = aggregate_df.drop(columns=['order_id', 'issued', 'duration', 'is_buy_order', 'timestamp'])
-#     df = doctrine_df.merge(final_orders, on='type_id', how='left')
-#
-#     return df
-
-
 def get_doctrine_status_optimized(target: int = 20) -> pd.DataFrame:
     fits_df = get_doctrine_fits(db_name='wc_fitting')
     fit_ids = fits_df['id'].tolist()
@@ -148,7 +124,6 @@ def get_doctrine_status_optimized(target: int = 20) -> pd.DataFrame:
     df3 = target_df.merge(df, on='fit_id', how='left')
     df4 = df3.merge(df2, on='doctrine_id', how='left')
     return df4
-
 
 def read_doctrine_watchlist(db_name: str = 'wc_fitting') -> list:
     try:
@@ -184,7 +159,6 @@ def read_doctrine_watchlist(db_name: str = 'wc_fitting') -> list:
     finally:
         if 'engine' in locals():
             engine.dispose()
-
 
 def clean_doctrine_columns(df: pd.DataFrame) -> pd.DataFrame:
     print(df.columns)

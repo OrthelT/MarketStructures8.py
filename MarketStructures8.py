@@ -6,6 +6,7 @@ from datetime import datetime
 
 import pandas as pd
 import requests
+from pandas import DataFrame
 from pandas.core.interchange.dataframe_protocol import DataFrame
 from requests import ReadTimeout
 
@@ -189,19 +190,15 @@ def fetch_market_history(fresh_data: bool == True) -> pd.DataFrame:
         for type_id in range(total_items):
             while page <= max_pages:
                 item = type_id_list[type_id]
-                # print(
-                #     f"\ritems retrieved: {successful_returns}/{total_items}", end=""
-                # )
 
                 try:
                     response = requests.get(
-                        market_history_url + str(item), headers=headers, timeout=timeout
-                    )
+                        market_history_url + str(item), headers=headers, timeout=timeout)
 
                     item_ratio: float = successful_returns / total_items
                     item_ratio_rounded: int = round(item_ratio * 100)
                     item_ratio_rounded_str: str = str(item_ratio_rounded) + "%"
-                    print(f"\rFetching history {item_ratio_rounded_str}...", end="")
+                    print(f"\rFetching history {item_ratio_rounded_str}...({item})", end="")
 
                     page += 1
 
@@ -249,7 +246,7 @@ def fetch_market_history(fresh_data: bool == True) -> pd.DataFrame:
             page = 1
             max_pages = 1
 
-        historical_df = pd.DataFrame(all_history)
+        historical_df: DataFrame = pd.DataFrame(all_history)
 
     else:
         logger.info('retrieving cached market history data')
@@ -374,8 +371,9 @@ def save_data(history: DataFrame, vale_jita: DataFrame, final_data: DataFrame, f
 
     final_data.to_csv(market_stats_filename, index=False)
 
-    logger.info('saving market stats to database')
-    status = sql_handler.update_stats(final_data)
+    logger.info(print('saving market stats to database'))
+    status = sql_handler.update_stats2(final_data)
+    logger.info(print(status))
     google_sheet_updater.google_sheet_updater()
     # save a copy of market stats to update spreadsheet consistently named
     src_folder = r"output"

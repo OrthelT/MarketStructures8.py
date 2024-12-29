@@ -62,6 +62,7 @@ stats_columns = [
     'timestamp'
 ]
 
+
 class MarketOrder(Base):
     __tablename__ = "market_order"
 
@@ -74,6 +75,7 @@ class MarketOrder(Base):
     duration: Mapped[int] = mapped_column(Integer)
     is_buy_order: Mapped[bool] = mapped_column(Boolean)
     timestamp: Mapped[datetime] = mapped_column(DateTime)
+
 
 class MarketHistory(Base):
     __tablename__ = "market_history"
@@ -89,6 +91,7 @@ class MarketHistory(Base):
 
     # Add composite primary key
     __table_args__ = (PrimaryKeyConstraint("date", "type_id"),)
+
 
 class MarketStats(Base):
     __tablename__ = "Market_Stats"
@@ -106,6 +109,7 @@ class MarketStats(Base):
     days_remaining: Mapped[int] = mapped_column(Integer, nullable=True)
     timestamp: Mapped[datetime] = mapped_column(DateTime)
 
+
 class Doctrine_Fits(Base):
     __tablename__ = "Doctrine_Fittings"
     doctrine_id: Mapped[int] = mapped_column(Integer)
@@ -116,6 +120,7 @@ class Doctrine_Fits(Base):
     ship_group: Mapped[str] = mapped_column(String(50))
     ship_group_id: Mapped[str] = mapped_column(String(100))
 
+
 class Fitting_Items(Base):
     __tablename__ = "Fittings"
     type_id: Mapped[str] = mapped_column(String(10), primary_key=True)
@@ -124,6 +129,7 @@ class Fitting_Items(Base):
     qty_required: Mapped[int] = mapped_column(Integer)
     fitting_version: Mapped[int] = mapped_column(Integer)
     is_hull: Mapped[bool] = mapped_column(Boolean)
+
 
 class CurrentOrders(Base):
     __tablename__ = "current_orders"
@@ -136,6 +142,7 @@ class CurrentOrders(Base):
     duration: Mapped[int] = mapped_column(Integer)
     is_buy_order: Mapped[bool] = mapped_column(Boolean)
     timestamp: Mapped[datetime] = mapped_column(DateTime)
+
 
 class ShortItems(Base):
     __tablename__ = "ShortItems"
@@ -153,6 +160,7 @@ class ShortItems(Base):
     ship_type_id: Mapped[int] = mapped_column(Integer, nullable=True)
     timestamp: Mapped[datetime] = mapped_column(DateTime, nullable=True)
 
+
 class Doctrine_Items(Base):
     __tablename__ = "Doctrine_Items"
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
@@ -168,6 +176,7 @@ class Doctrine_Items(Base):
     doctrine_id: Mapped[int] = mapped_column(Integer, nullable=True)
     ship_type_id: Mapped[int] = mapped_column(Integer, nullable=True)
     timestamp: Mapped[datetime] = mapped_column(DateTime, nullable=True)
+
 
 def process_dataframe(
         df: pl.DataFrame, columns: list, date_column: str = None
@@ -216,6 +225,7 @@ def process_pd_dataframe(
 
     return df
 
+
 def insert_type_names(df: pl.DataFrame) -> pl.DataFrame:
     engine = create_engine(mkt_sqlfile, echo=False)
 
@@ -234,6 +244,7 @@ def insert_type_names(df: pl.DataFrame) -> pl.DataFrame:
         .alias("type_name")
     )
     return df_named
+
 
 def insert_pd_type_names(df: pd.DataFrame) -> pd.DataFrame:
     engine = create_engine(mkt_sqlfile, echo=False)
@@ -256,6 +267,7 @@ def insert_pd_type_names(df: pd.DataFrame) -> pd.DataFrame:
 
     return df2
 
+
 def insert_timestamp(df: pl.DataFrame) -> pl.DataFrame:
     ts = datetime.now(timezone.utc)
     df = df.with_columns(
@@ -263,11 +275,22 @@ def insert_timestamp(df: pl.DataFrame) -> pl.DataFrame:
     )
     return df
 
+
 def insert_pd_timestamp(df: pd.DataFrame) -> pd.DataFrame:
-    df = df.copy()
+    df2 = df.copy()
     ts = datetime.now(timezone.utc)
-    df.loc[:, "timestamp"] = ts
-    return df
+
+    # detect if timestamp already exists
+    if 'timestamp' in df2.columns:
+        if pd.api.types.is_datetime64_any_dtype(df2['timestamp']):
+            print('timestamp exists')
+            return df2
+        else:
+            df2.drop(columns=['timestamp'], inplace=True)
+
+    df2.loc[:, "timestamp"] = ts
+    return df2
+
 
 def process_esi_market_order_optimized(data: List[dict], is_history: bool = False) -> str:
     # Create a DataFrame from the list of dictionaries
@@ -280,6 +303,7 @@ def process_esi_market_order_optimized(data: List[dict], is_history: bool = Fals
             # Bulk insert using Pandas
         except Exception as e:
             print(f"Error updating history data: {str(e)}")
+            status = f"Error updating history data: {str(e)}"
             raise
 
     # Skip type name update and current order update if history is True
@@ -287,9 +311,12 @@ def process_esi_market_order_optimized(data: List[dict], is_history: bool = Fals
         try:
             status = update_orders(df)
         except Exception as e:
-            print(f"Error updating ordrs: {str(e)}")
+            print(f"Error updating orders: {str(e)}")
+            status = f"Error updating orders: {str(e)}"
+            raise
 
     return f"{status} Doctrine items loading completed successfully!"
+
 
 def update_history(df: pd.DataFrame) -> str:
     engine = create_engine(mkt_sqlfile, echo=False)
@@ -320,9 +347,12 @@ def update_history(df: pd.DataFrame) -> str:
 
     return status
 
+
 def update_orders(df: pd.DataFrame) -> str:
+    sql_logger.info("updating orders...initiating engine")
     engine = create_engine(mkt_sqlfile, echo=False)
 
+    sql_logger.info("updating orders...optimizing for bulk update")
     optimize_for_bulk_update(engine)
 
     with engine.connect() as con:
@@ -349,6 +379,7 @@ def update_orders(df: pd.DataFrame) -> str:
 
     return status
 
+
 def read_history(doys: int = 30) -> pd.DataFrame:
     engine = create_engine(mkt_sqlfile, echo=False)
 
@@ -365,6 +396,7 @@ def read_history(doys: int = 30) -> pd.DataFrame:
     session.close()
     print(f'connection closed: {session}...returning orders from market_history table.')
     return historydf
+
 
 def update_current_orders(df: pl.DataFrame) -> str:
     df_processed = insert_type_names(df)
@@ -408,13 +440,14 @@ def update_current_orders(df: pl.DataFrame) -> str:
 
     return status
 
-def update_stats(df: pd.DataFrame) -> str:
-    # process the df
-    df.fillna(0)
-    df_pl = pl.from_pandas(df)
-    df_processed = insert_timestamp(df_pl)
 
-    records = df_processed.to_dicts()
+def update_stats(df: pd.DataFrame) -> str:
+    df = df.infer_objects()
+    df = df.fillna(0)
+
+    df_processed = insert_pd_timestamp(df)
+
+    records = df_processed.to_dict()
 
     # start a session
     engine = create_engine(f"sqlite:///{sql_file}", echo=False)
@@ -463,6 +496,79 @@ def update_stats(df: pd.DataFrame) -> str:
         finally:
             session.close()
             return "Stats loading completed successfully!"
+
+
+def update_stats2(df: pd.DataFrame) -> str:
+    df = df.infer_objects()
+    df = df.fillna(0)
+
+    df_processed = insert_pd_timestamp(df)
+
+    # start a session
+    engine = create_engine(mkt_sqlfile, echo=False)
+    try:
+        # clear existing table
+        with engine.connect() as conn:
+
+            conn.execute(text("DELETE FROM Market_Stats"))
+            conn.commit()
+            print("Table cleared")
+
+        df_processed.to_sql('Market_Stats', engine,
+                            if_exists='replace',
+                            index=False,
+                            method='multi',
+                            chunksize=1000)
+        status = "Data loading completed successfully!"
+        missing_status = fill_missing_stats()
+        status = status + missing_status
+        return status
+    except Exception as e:
+        print(f"Error occurred: {str(e)}")
+        raise
+
+
+def fill_missing_stats() -> str:
+    stats = read_sql_market_stats()
+    watchlist = read_sql_watchlist()
+
+    stats['type_id'] = stats['type_id'].astype(int)
+
+    missing = watchlist[~watchlist['type_id'].isin(stats['type_id'])]
+
+    missing_df = pd.DataFrame(
+        columns=['type_id', 'total_volume_remain', 'min_price', 'price_5th_percentile',
+                 'avg_of_avg_price', 'avg_daily_volume', 'group_id', 'type_name',
+                 'group_name', 'category_id', 'category_name', 'days_remaining', 'timestamp'])
+    missing_df = pd.concat([missing, missing_df])
+    missing_df['timestamp'] = stats['timestamp']
+    missing_df['total_volume_remain'] = stats['total_volume_remain']
+
+    # fill historical values where available
+    hist = read_history(30)
+    hist_grouped = hist.groupby("type_id").agg({'average': 'mean', 'volume': 'mean'})
+    missing_df['avg_of_avg_price'] = missing_df['type_id'].map(hist_grouped['average'])
+    missing_df['avg_daily_volume'] = missing_df['type_id'].map(hist_grouped['volume'])
+
+    # deal with remaining null values
+    missing_df = missing_df.infer_objects()
+    missing_df.fillna(0, inplace=True)
+
+    # update the database
+    engine = create_engine(mkt_sqlfile, echo=False)
+    try:
+        with engine.connect() as conn:
+            missing_df.to_sql('Market_Stats', engine,
+                              if_exists='append',
+                              index=False,
+                              method='multi',
+                              chunksize=1000
+                              )
+        return "missing Stats loading completed successfully!"
+    except Exception as e:
+        print(f"Error occurred: {str(e)}")
+        raise
+
 
 def update_short_items(df: pd.DataFrame) -> str:
     # process the df
@@ -520,6 +626,7 @@ def update_short_items(df: pd.DataFrame) -> str:
 
     return "Short items loading completed successfully!"
 
+
 def update_short_items_optimized(df: pd.DataFrame) -> str:
     # process the df
     df_processed = insert_pd_timestamp(df)
@@ -538,6 +645,7 @@ def update_short_items_optimized(df: pd.DataFrame) -> str:
 
     return f"{status} Short items loading completed successfully!"
 
+
 def read_short_items() -> pd.DataFrame:
     engine = create_engine(f"sqlite:///{sql_file}", echo=False)
     df = pd.read_sql_query("SELECT * FROM ShortItems", engine)
@@ -546,6 +654,7 @@ def read_short_items() -> pd.DataFrame:
 
     return df
 
+
 def read_doctrine_items() -> pd.DataFrame:
     engine = create_engine(f"sqlite:///{sql_file}", echo=False)
     df = pd.read_sql_query("SELECT * FROM Doctrine_Items", engine)
@@ -553,6 +662,7 @@ def read_doctrine_items() -> pd.DataFrame:
     print(f'connection closed: {engine}...returning orders from ShortItems table.')
 
     return df
+
 
 def create_joined_invtypes_table():
     sql_logger.info("Creating joined_invtypes table...")
@@ -642,6 +752,7 @@ def create_joined_invtypes_table():
         sqlite_session.close()
         mysql_session.close()
 
+
 def get_missing_icons():
     SDEsql = '../ESI_Utilities/SDE/SDE sqlite-latest.sqlite'
     mysql_uri = f"mysql+pymysql://{fit_sqlfile}"
@@ -658,6 +769,7 @@ def get_missing_icons():
 
     con.close()
     print(len(df))
+
 
 def update_doctrine_items(df: pd.DataFrame) -> str:
     # process the df
@@ -713,17 +825,20 @@ def update_doctrine_items(df: pd.DataFrame) -> str:
 
     return "Doctrine items loading completed successfully!"
 
+
 def optimize_for_bulk_update(engine):
     # Optimize database settings for bulk insert
     with engine.begin() as conn:
         conn.execute(text("PRAGMA synchronous = OFF;"))
         conn.execute(text("PRAGMA journal_mode = MEMORY;"))
 
+
 def revert_sqlite_settings(engine):
     # Revert SQLite to safer defaults
     with engine.begin() as conn:
         conn.execute(text("PRAGMA synchronous = FULL;"))
         conn.execute(text("PRAGMA journal_mode = DELETE;"))
+
 
 def read_sql_watchlist() -> pd.DataFrame:
     engine = create_engine(mkt_sqlfile, echo=False)
@@ -741,5 +856,21 @@ def read_sql_market_stats() -> pd.DataFrame:
     with engine.connect() as conn:
         df = pd.read_sql_table('Market_Stats', conn)
     return df
+
+
+def validate_dataframe(df: pd.DataFrame):
+    validated_data = []
+    errors = []
+
+    for index, row in df.iterrows():
+        try:
+            record = MarketStats(**row.to_dict())
+            validated_data.append(record)
+        except Exception as e:
+            errors.append((index, str(e)))
+
+    return validated_data, errors
+
+
 if __name__ == "__main__":
     pass
