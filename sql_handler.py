@@ -1,11 +1,8 @@
-import json
-
-import polars as pl
-import pandas as pd
 from datetime import datetime, timezone
 from typing import Optional, List
 
-from prompt_toolkit import shortcuts
+import pandas as pd
+import polars as pl
 from sqlalchemy import (
     create_engine,
     String,
@@ -15,16 +12,9 @@ from sqlalchemy import (
     Boolean,
     PrimaryKeyConstraint,
     text,
-    Table, MetaData, Column, inspect,
-)
-from sqlalchemy.orm import DeclarativeBase, declarative_base, mapped_column, sessionmaker, foreign, Mapped
-import pymysql
-import sqlite3
-import logging
+    Table, MetaData, Column, )
+from sqlalchemy.orm import declarative_base, mapped_column, sessionmaker, Mapped
 
-import db_handler
-from db_handler import read_market_stats
-from doctrine_monitor import clean_doctrine_columns
 from logging_tool import configure_logging
 
 sql_logger = configure_logging(
@@ -147,7 +137,6 @@ class CurrentOrders(Base):
     is_buy_order: Mapped[bool] = mapped_column(Boolean)
     timestamp: Mapped[datetime] = mapped_column(DateTime)
 
-
 class ShortItems(Base):
     __tablename__ = "ShortItems"
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
@@ -164,7 +153,6 @@ class ShortItems(Base):
     ship_type_id: Mapped[int] = mapped_column(Integer, nullable=True)
     timestamp: Mapped[datetime] = mapped_column(DateTime, nullable=True)
 
-
 class Doctrine_Items(Base):
     __tablename__ = "Doctrine_Items"
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
@@ -180,12 +168,6 @@ class Doctrine_Items(Base):
     doctrine_id: Mapped[int] = mapped_column(Integer, nullable=True)
     ship_type_id: Mapped[int] = mapped_column(Integer, nullable=True)
     timestamp: Mapped[datetime] = mapped_column(DateTime, nullable=True)
-
-def create_session():
-    engine = create_engine(f"sqlite:///{sql_file}", echo=False)
-    Session = sessionmaker(bind=engine)
-
-    return Session, engine
 
 def process_dataframe(
         df: pl.DataFrame, columns: list, date_column: str = None
@@ -854,7 +836,6 @@ def revert_sqlite_settings(engine):
         conn.execute(text("PRAGMA synchronous = FULL;"))
         conn.execute(text("PRAGMA journal_mode = DELETE;"))
 
-
 def read_sql_watchlist() -> pd.DataFrame:
     engine = create_engine(mkt_sqlfile, echo=False)
     with engine.connect() as conn:
@@ -865,5 +846,11 @@ def read_sql_watchlist() -> pd.DataFrame:
         })
     return df
 
+
+def read_sql_market_stats() -> pd.DataFrame:
+    engine = create_engine(mkt_sqlfile, echo=False)
+    with engine.connect() as conn:
+        df = pd.read_sql_table('Market_Stats', conn)
+    return df
 if __name__ == "__main__":
     pass

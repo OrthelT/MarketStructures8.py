@@ -9,15 +9,14 @@ import requests
 from pandas.core.interchange.dataframe_protocol import DataFrame
 from requests import ReadTimeout
 
-import db_handler as dbhandler
-import sql_handler
 import google_sheet_updater
+import sql_handler
 from ESI_OAUTH_FLOW import get_token
+from doctrine_monitor import read_doctrine_watchlist, get_doctrine_status_optimized
 from file_cleanup import rename_move_and_archive_csv
 from get_jita_prices import get_jita_prices
 from logging_tool import configure_logging
 from sql_handler import process_esi_market_order_optimized
-from doctrine_monitor import read_doctrine_watchlist, get_doctrine_status_optimized
 
 # GNU General Public License
 #

@@ -1,14 +1,10 @@
-from logging import FileHandler
+import logging
 
 import gspread
-from google.oauth2.service_account import Credentials
 import pandas as pd
-import json
-import db_handler
-import doctrine_monitor
+from google.oauth2.service_account import Credentials
+
 import sql_handler
-import logging
-import datetime
 from logging_tool import configure_logging
 
 logger = configure_logging(
@@ -33,7 +29,7 @@ def get_credentials(SCOPES: list):
 def google_sheet_updater() -> str:
     gc = get_credentials(SCOPES)
 
-    df = db_handler.read_market_stats()
+    df = sql_handler.read_sql_market_stats()
     new_cols = ['type_id', 'type_name', 'days_remaining', 'total_volume_remain', 'price_5th_percentile',
                 'avg_daily_volume', 'avg_of_avg_price', 'min_price', 'group_name', 'category_name',
                 'group_id', 'category_id', 'timestamp']
