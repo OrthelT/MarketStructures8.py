@@ -855,6 +855,15 @@ def revert_sqlite_settings(engine):
         conn.execute(text("PRAGMA journal_mode = DELETE;"))
 
 
+def read_sql_watchlist() -> pd.DataFrame:
+    engine = create_engine(mkt_sqlfile, echo=False)
+    with engine.connect() as conn:
+        df = pd.read_sql_table('watchlist_mkt', conn)
+    df = df.rename(
+        columns={
+            "typeID": "type_id",
+        })
+    return df
 
 if __name__ == "__main__":
     pass

@@ -164,7 +164,7 @@ def fetch_market_orders():
 
 # update market history
 def fetch_market_history(fresh_data: bool == True) -> pd.DataFrame:
-    watchlist = dbhandler.read_watchlist()
+    watchlist = sql_handler.read_sql_watchlist()
     type_id_list = watchlist["type_id"].unique().tolist()
 
     if fresh_data:
@@ -270,7 +270,7 @@ def aggregate_sell_orders(market_orders_json: any) -> pd.DataFrame:
 
     orders = pd.DataFrame(market_orders_json)
 
-    ids = dbhandler.read_watchlist()
+    ids = sql_handler.read_sql_watchlist()
     ids = ids["type_id"].tolist()
 
     filtered_orders = orders[orders["type_id"].isin(ids)]
@@ -406,7 +406,7 @@ if __name__ == "__main__":
 
     # retrieve current watchlist from database
     logger.info(f"reading watchlist from database")
-    watchlist = dbhandler.read_watchlist()
+    watchlist = sql_handler.read_sql_watchlist()
     doctrine_watchlist = read_doctrine_watchlist('wc_fitting')
     logger.info(f"retrieved {len(watchlist)} type_ids. watchlist is:  {type(watchlist)}")
 

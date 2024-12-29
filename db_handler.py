@@ -19,7 +19,6 @@ def read_market_orders():
     print(f'connection closed: {conn}...returning orders from pan_db_handler')
     return orders
 
-
 def read_market_stats() -> pd.DataFrame:
     engine = sq.create_engine("sqlite:///market_orders.sqlite")
     conn = engine.connect()
@@ -28,20 +27,6 @@ def read_market_stats() -> pd.DataFrame:
     conn.close()
     print(f'connection closed: {conn}...returning orders from pan_db_handler')
     return stats
-
-
-def read_watchlist() -> pd.DataFrame:
-    conn = initiate_connection(
-        database=r"market_orders.sqlite"
-    )
-    df = pd.read_sql("SELECT * FROM watchlist_mkt", conn)
-    conn.close()
-    df = df.rename(
-        columns={
-            "typeID": "type_id",
-        })
-    return df
-
 
 def read_history(doys: int = 30):
     conn = sqlite3.connect("market_orders.sqlite")
