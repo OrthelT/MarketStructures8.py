@@ -252,20 +252,20 @@ def fetch_market_history(fresh_data: bool == True) -> pd.DataFrame:
         historical_df = pd.DataFrame(all_history)
 
     else:
-        logging.info('retrieving cached market history data')
+        logger.info('retrieving cached market history data')
         historical_df = sql_handler.read_history(30)
         all_history = None
 
-    logging.info(f"history data complete. {len(historical_df)} records retrieved.")
-    logging.info("returning history_df")
+    logger.info(f"history data complete. {len(historical_df)} records retrieved.")
+    logger.info("returning history_df")
 
     return historical_df, all_history
 # ===============================================
 # Functions: Process Market Stats
 # -----------------------------------------------
 def aggregate_sell_orders(market_orders_json: any) -> pd.DataFrame:
-    logging.info("aggregating sell orders")
-    logging.info(f'market orders type:{type(market_orders_json)}')
+    logger.info("aggregating sell orders")
+    logger.info(f'market orders type:{type(market_orders_json)}')
 
     orders = pd.DataFrame(market_orders_json)
 
@@ -275,9 +275,9 @@ def aggregate_sell_orders(market_orders_json: any) -> pd.DataFrame:
     filtered_orders = orders[orders["type_id"].isin(ids)]
     sell_orders = filtered_orders[filtered_orders["is_buy_order"] == False]
 
-    logging.info(f'filtered orders: {len(filtered_orders)}')
-    logging.info(f'sell orders: {len(sell_orders)}')
-    logging.info("aggregating orders")
+    logger.info(f'filtered orders: {len(filtered_orders)}')
+    logger.info(f'sell orders: {len(sell_orders)}')
+    logger.info("aggregating orders")
 
     grouped_df = sell_orders.groupby("type_id")["volume_remain"].sum().reset_index()
     grouped_df.columns = ["type_id", "total_volume_remain"]
@@ -289,8 +289,8 @@ def aggregate_sell_orders(market_orders_json: any) -> pd.DataFrame:
     percentile_5th_df.columns = ["type_id", "price_5th_percentile"]
     merged_df = pd.merge(grouped_df, min_price_df, on="type_id")
     merged_df = pd.merge(merged_df, percentile_5th_df, on="type_id")
-    logging.info("successfully merged dataframes and completed aggregation")
-    logging.info(f"returning merged dataframe with {len(merged_df)} rows")
+    logger.info("successfully merged dataframes and completed aggregation")
+    logger.info(f"returning merged dataframe with {len(merged_df)} rows")
     return merged_df
 
 def merge_market_stats(merged_orders: pd.DataFrame, history_data: pd.DataFrame):
@@ -344,16 +344,15 @@ def update_doctrine_status(target: int = 20):
     print("Completed doctrines check")
 
 def process_orders(market_orders, history_data):
-
-    logging.info("aggregating sell orders")
+    logger.info("aggregating sell orders")
     print(type(market_orders))
     merged_sell_orders = aggregate_sell_orders(market_orders)
 
-    logging.info("merging historical data")
+    logger.info("merging historical data")
     final_data = merge_market_stats(merged_sell_orders, history_data)
 
     print(type(final_data))
-    logging.info("getting jita prices")
+    logger.info("getting jita prices")
     vale_jita = get_jita_prices(final_data)
     return vale_jita, final_data
 
@@ -374,6 +373,8 @@ def save_data(history: DataFrame, vale_jita: DataFrame, final_data: DataFrame, f
         history.to_csv(history_filename, index=False)
 
     final_data.to_csv(market_stats_filename, index=False)
+
+    logger.info('saving market stats to database')
     status = sql_handler.update_stats(final_data)
     google_sheet_updater.google_sheet_updater()
     # save a copy of market stats to update spreadsheet consistently named
@@ -383,10 +384,9 @@ def save_data(history: DataFrame, vale_jita: DataFrame, final_data: DataFrame, f
     # cleanup files. "Full cleanup true" moves old files from output to archive.
     rename_move_and_archive_csv(src_folder, latest_folder, archive_folder, True)
 
-    logging.info("saving vale_jita data")
+    logger.info("saving vale_jita data")
     vale_jita.to_csv("output/latest/vale_jita.csv", index=False)
 
-    logging.info('saving market stats to database')
 
     print(status)
 
@@ -449,7 +449,7 @@ if __name__ == "__main__":
     # Completed stats
     finish_time = datetime.now()
     total_time = finish_time - start_time
-    logging.info(f"""
+    logger.info(f"""
     start time: {start_time}
     finish time: {finish_time}
     ---------------------------
@@ -458,7 +458,8 @@ if __name__ == "__main__":
 
     print("===================================================")
     print("ESI Request Completed Successfully.")
-    logging.info(f"Data for {len(final_data)} items retrieved.")
-    logging.info(f"Total time: {total_time}")
     print("=====================================================")
-    logging.info("market update complete")
+
+    logger.info(f"Data for {len(final_data)} items retrieved.")
+    logger.info(f"Total time: {total_time}")
+    logger.info("market update complete")
