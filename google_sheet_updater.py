@@ -69,57 +69,22 @@ def google_sheet_updater() -> str:
         raise
     return message
 
-def google_sheet_updater_short() -> str:
+
+def google_sheet_updater_doctrine_items(df: pd.DataFrame) -> str:
     # This function grabs items we have identified as being in short supply and posts to Google sheets.
     # Read data from the SQL handler
-    df = sql_handler.read_short_items()
-    new_cols = [
-        'type_id', 'type_name', 'fits_on_market', 'quantity',
-        'volume_remain', 'price',
-        'delta', 'id', 'fit_id', 'doctrine_name', 'timestamp']
+    # df = sql_handler.read_doctrine_items()
+    #
+    # new_cols = [
+    #     'type_id', 'type_name', 'fits_on_market', 'quantity',
+    #     'volume_remain', 'price',
+    #     'delta', 'id', 'fit_id', 'doctrine_name', 'timestamp']
     # Ensure DataFrame columns are in the expected order
-    df = df[new_cols]
-    # Clean the DataFrame to ensure JSON compliance
-    df = fill_na(df)
+    # df = df[new_cols]
+    # # Clean the DataFrame to ensure JSON compliance
+    # df = fill_na(df)
     # Convert DataFrame to a list of lists (Google Sheets format)
-    data_list = [df.columns.tolist()] + df.astype(str).values.tolist()
-
-    # access credentials to update Google sheets
-    gc = get_credentials(SCOPES)
-    # Open the Google Sheet by name
-    wb = gc.open("4H Market Status")
-    # Use the worksheet name to select the correct sheet
-    sheet = wb.worksheet("ShortItems")
-    try:
-        # Clear the existing content in the sheet
-        clear = sheet.clear()
-        logger.info(clear)
-        # Update the sheet with new data, starting at cell A1
-        result = sheet.update(
-            values=data_list, range_name='A1')
-        print(result)
-        message = "Short items data updated successfully!"
-    except Exception as e:
-        message = f"An error occurred while updating short items: {str(e)}"
-        print(message)
-        raise
-    return message
-
-
-def google_sheet_updater_doctrine_items() -> str:
-    # This function grabs items we have identified as being in short supply and posts to Google sheets.
-    # Read data from the SQL handler
-    df = sql_handler.read_doctrine_items()
-
-    new_cols = [
-        'type_id', 'type_name', 'fits_on_market', 'quantity',
-        'volume_remain', 'price',
-        'delta', 'id', 'fit_id', 'doctrine_name', 'timestamp']
-    # Ensure DataFrame columns are in the expected order
-    df = df[new_cols]
-    # Clean the DataFrame to ensure JSON compliance
-    df = fill_na(df)
-    # Convert DataFrame to a list of lists (Google Sheets format)
+    df.drop(columns=['description', 'created'], inplace=True)
     data_list = [df.columns.tolist()] + df.astype(str).values.tolist()
     # access credentials to update Google sheets
     gc = get_credentials(SCOPES)

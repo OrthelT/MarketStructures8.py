@@ -227,7 +227,7 @@ def process_pd_dataframe(
 
     # Convert date strings to datetime objects
     if date_column:
-        df[date_column] = pd.to_datetime(df[date_column], errors='coerce')
+        df.loc[:, date_column] = pd.to_datetime(df[date_column], errors='coerce')
 
     # Insert timestamp
     df = insert_pd_timestamp(df)
@@ -285,7 +285,7 @@ def insert_timestamp(df: pl.DataFrame) -> pl.DataFrame:
 
 def insert_pd_timestamp(df: pd.DataFrame) -> pd.DataFrame:
     ts = datetime.now(timezone.utc)
-    df["timestamp"] = ts
+    df.loc[:, "timestamp"] = ts
     return df
 
 def initialize_database(engine, base):
@@ -398,7 +398,6 @@ def process_esi_market_order(data: list, is_history: Boolean = False) -> str:
 
     return status
 
-
 def process_esi_market_order_optimized(data: List[dict], is_history: bool = False) -> str:
     # Create a DataFrame from the list of dictionaries
     df = pd.DataFrame(data)
@@ -420,7 +419,6 @@ def process_esi_market_order_optimized(data: List[dict], is_history: bool = Fals
             print(f"Error updating ordrs: {str(e)}")
 
     return f"{status} Doctrine items loading completed successfully!"
-
 
 def update_history(df: pd.DataFrame) -> str:
     engine = create_engine(mkt_sqlfile, echo=False)
@@ -450,7 +448,6 @@ def update_history(df: pd.DataFrame) -> str:
     revert_sqlite_settings(engine)
 
     return status
-
 
 def update_orders(df: pd.DataFrame) -> str:
     engine = create_engine(mkt_sqlfile, echo=False)
@@ -651,7 +648,6 @@ def update_short_items(df: pd.DataFrame) -> str:
             raise
 
     return "Short items loading completed successfully!"
-
 
 def update_short_items_optimized(df: pd.DataFrame) -> str:
     # process the df

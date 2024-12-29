@@ -1,9 +1,12 @@
 
 import pandas as pd
 import sqlalchemy
+from altair import to_csv
 from sqlalchemy import exc, Engine, engine, create_engine
+from tornado.gen import Return
 
-from db_handler import read_market_orders
+mkt_sqlfile = "sqlite:///market_orders.sqlite"
+fit_mysqlfile = "mysql+pymysql://Orthel:Dawson007!27608@localhost:3306/wc_fitting"
 
 
 def get_doctrine_fits(db_name: str = 'wc_fitting') -> pd.DataFrame:
@@ -15,149 +18,137 @@ def get_doctrine_fits(db_name: str = 'wc_fitting') -> pd.DataFrame:
     print('accessing doctrines...')
     table_name = 'watch_doctrines'
 
-    # query = f"SELECT id, name FROM {table_name}"
-    # df = pd.read_sql_query(query, engine)
+    query = f"SELECT id, name FROM {table_name}"
 
-    df = pd.read_sql_table('watch_doctrines', engine)
+    with engine.connect() as connection:
+        df = pd.read_sql_query(query, connection)
 
     doctrine_ids = ", ".join(map(str, df['id'].tolist()))
 
-    query = f"SELECT doctrine_id, fitting_id FROM fittings_doctrine_fittings WHERE doctrine_id in ([doctrines_ids]);"
-
     # Use the ids in the second query
-    query = f"""
+    query2 = f"""
         SELECT doctrine_id, fitting_id 
         FROM fittings_doctrine_fittings 
         WHERE doctrine_id IN ({doctrine_ids})
     """
-    fittings = pd.read_sql_query(query, engine)
-
-    # Get the doctrine names
     doctrine_query = "SELECT id as doctrine_id, name as doctrine_name FROM watch_doctrines"
-    doctrine_df = pd.read_sql_query(doctrine_query, engine)
 
-    # Merge with your existing dataframe
+    with engine.connect() as connection:
+        fittings = pd.read_sql_query(query2, connection)
+        doctrine_df = pd.read_sql_query(doctrine_query, engine)  # Get the doctrine names
+
+    # # Merge with  existing dataframe
     result_df = fittings.merge(doctrine_df, on='doctrine_id', how='left')
     fit_ids = ", ".join(map(str, result_df['fitting_id'].tolist()))
 
-    query = f"""
-        SELECT f.id, f.name, f.ship_type_id, t.type_name 
+    query3 = f"""
+        SELECT f.id, f.name, f.ship_type_id, t.type_name
         FROM fittings_fitting f
         JOIN fittings_type t ON t.type_id = f.ship_type_id
         WHERE f.id IN ({fit_ids})
     """
-    df = pd.read_sql_query(query, engine)
-    print(f'{len(df)} fits retrieved')
-    print('closing db connection with engine.dispose()')
-    engine.dispose()
+
+    with engine.connect() as conn:
+        df = pd.read_sql_query(query3, engine)
     return df
 
-def get_fit_items(df, fit_id: int):
+
+def get_fit_items(df: pd.DataFrame, id_list: list):
     cols = ['id', 'name', 'ship_type_id', 'type_name']
-    db_name = 'wc_fitting'
-    mysql_connection = f"mysql+mysqlconnector://Orthel:Dawson007!27608@localhost:3306/{db_name}"
+    df = df.rename({'id': 'fit_id', 'name': 'doctrine_name'}, axis="columns")
+
+    mysql_connection = f"mysql+mysqlconnector://Orthel:Dawson007!27608@localhost:3306/wc_fitting"
     engine = sqlalchemy.create_engine(mysql_connection)
-    filtered_df = df[df['id'] == fit_id]
-    df = filtered_df.rename({'id': 'fit_id', 'ship_type_id': 'type_id', 'name': 'doctrine_name'}, axis="columns")
 
     query = f"""
-        SELECT id, type_id, quantity 
+        SELECT fit_id, type_id, quantity 
         FROM fittings_fittingitem
-        WHERE fit_id = {fit_id};
     """
+    with engine.connect() as conn:
+        df2 = pd.read_sql_query(query, conn)
+    df3 = df.merge(df2, on='fit_id', how='left')
+    grouped_df = df3.groupby(['fit_id', 'type_id', 'doctrine_name', 'type_name', 'ship_type_id'])[
+        'quantity'].sum().reset_index()
 
-    df2 = pd.read_sql_query(query, engine)
-    df2 = df2.groupby('type_id').sum()
-    df2.drop(columns=['id'], inplace=True)
-    df2.reset_index(inplace=True)
+    # Identify rows to be added
+    ship_rows = grouped_df[['fit_id', 'ship_type_id', 'doctrine_name', 'type_name']].drop_duplicates()
 
-    doctrine_name = df['doctrine_name'].tolist()[0]
-    df2['fit_id'] = fit_id
-    df2['doctrine_name'] = doctrine_name
+    # Create new rows where type_id = ship_type_id
+    new_rows = ship_rows.rename(columns={'ship_type_id': 'type_id'})
+    new_rows['quantity'] = 1
 
-    fit_type_ids = ", ".join(map(str, df2['type_id'].tolist()))
+    # Ensure all columns are populated
+    new_rows['doctrine_name'] = ship_rows['doctrine_name']
+    new_rows['type_name'] = ship_rows['type_name']
+    new_rows['ship_type_id'] = ship_rows['ship_type_id']  # Restore ship_type_id column for reference
 
-    query = f"""
+    # Append the new rows to the existing dataframe
+    updated_df = pd.concat([grouped_df, new_rows], ignore_index=True)
+    updated_df.rename(columns={'type_name': 'ship_type_name'}, inplace=True)
+
+    fit_type_ids = ", ".join(map(str, updated_df['type_id'].tolist()))
+
+    query2 = f"""
         SELECT type_id as type_id, type_name as type_name from fittings_type
         WHERE type_id IN ({fit_type_ids});
     """
-    fit_names = pd.read_sql_query(query, engine)
-    engine.dispose()
+    with engine.connect() as conn:
+        fit_names = pd.read_sql_query(query2, conn)
 
-    df4 = df2.merge(fit_names, on='type_id', how='left')
-    df['quantity'] = 1
-    fit_items = pd.concat([df, df4])
+    df4 = updated_df.merge(fit_names, on='type_id', how='left')
+    fit_items = df4[['type_id', 'type_name', 'quantity', 'doctrine_name', 'ship_type_name', 'ship_type_id', 'fit_id', ]]
     return fit_items
 
-def get_market_stats(doctrine_df: pd.DataFrame, orders: pd.DataFrame, target: int = 20) -> pd.DataFrame:
-    # Convert orders type_id to integer
-    orders['type_id'] = pd.to_numeric(orders['type_id'])
-    sell_orders = orders[orders['is_buy_order'] == False]
-    # process orders and evaluate marget status
-    doctrine_orders = sell_orders[sell_orders['type_id'].isin(doctrine_df['type_id'])]
-    most_recent = doctrine_orders['timestamp'].max()
-    doctrine_orders = doctrine_orders[doctrine_orders['timestamp'] == most_recent]
-    doctrine_orders.reset_index(drop=True, inplace=True)
-    aggregate_df = doctrine_orders.groupby('type_id').sum()
-    aggregate_df.reset_index(inplace=True)
-    final_orders = aggregate_df.drop(columns=['order_id', 'issued', 'duration', 'is_buy_order', 'timestamp'])
-    df = doctrine_df.merge(final_orders, on='type_id', how='left')
-    return df
+
+# def get_market_stats(doctrine_df: pd.DataFrame, orders: pd.DataFrame, target: int = 20) -> pd.DataFrame:
+#     # Convert orders type_id to integer
+#     orders['type_id'] = pd.to_numeric(orders['type_id'])
+#     # process orders and evaluate marget status
+#     doctrine_orders = orders[orders['type_id'].isin(doctrine_df['type_id'])]
+#     most_recent = doctrine_orders['timestamp'].max()
+#     doctrine_orders = doctrine_orders[doctrine_orders['timestamp'] == most_recent]
+#     doctrine_orders.reset_index(drop=True, inplace=True)
+#     aggregate_df = doctrine_orders.groupby('type_id').sum()
+#     aggregate_df.reset_index(inplace=True)
+#     print(aggregate_df.head())
+#     print(aggregate_df.columns)
+#     print(doctrine_df.head())
+#     print(doctrine_df.columns)
+#     final_orders = aggregate_df.drop(columns=['order_id', 'issued', 'duration', 'is_buy_order', 'timestamp'])
+#     df = doctrine_df.merge(final_orders, on='type_id', how='left')
+#
+#     return df
 
 
 def get_doctrine_status_optimized(target: int = 20) -> pd.DataFrame:
-    target_df = pd.DataFrame()
     fits_df = get_doctrine_fits(db_name='wc_fitting')
     fit_ids = fits_df['id'].tolist()
+    target_items = get_fit_items(fits_df, fit_ids)
 
-    return get_doctrine_status(
-        target=target
-    )
+    engine = create_engine(mkt_sqlfile)
+    with engine.connect() as conn:
+        market_stats = pd.read_sql_table('Market_Stats', conn)
 
-def get_doctrine_status(target: int = 20) -> pd.DataFrame:
-    target_df = pd.DataFrame()
-    fits_df = get_doctrine_fits(db_name='wc_fitting')
-    fit_ids = fits_df['id'].tolist()
-    c = 1
-    print('accessing SQLLite DB....\n'
-          'reading market_orders...')
-    print('------------------------')
-    orders = read_market_orders()
-    print(f'{len(orders)} retrieved')
-    print('processing market stats...')
+    market_stats['type_id'] = market_stats['type_id'].astype(int)
+    target_df = target_items.merge(market_stats, on='type_id', how='left')
+    target_df.drop(columns=['type_name_y'], inplace=True)
+    target_df.rename(columns={'type_name_x': 'type_name', 'doctrine_name': 'fit_name'}, inplace=True)
 
-    for id in fit_ids:
-        fit_items = get_fit_items(fits_df, id)
-        c += 1
-        markets = get_market_stats(doctrine_df=fit_items, orders=orders, target=target)
-        if markets is not None:
-            target_df = pd.concat([target_df, markets])
-        else:
-            continue
-    target_df['fits_on_market'] = target_df['volume_remain'] / target_df['quantity']
+    target_df['fits_on_market'] = target_df['total_volume_remain'] / target_df['quantity']
     target_df['fits_on_market'] = target_df['fits_on_market'].round(0)
     target_df['delta'] = target_df['fits_on_market'] - target
-    target_df.drop(columns=['type_name_y'], inplace=True)
-    target_df.rename(columns={'type_name_x': 'type_name'}, inplace=True)
 
-    target_ids = target_df['fit_id'].unique().tolist()
-    short_df = pd.DataFrame(columns=target_df.columns)
+    engine = create_engine(fit_mysqlfile)
+    with engine.connect() as conn:
+        df = pd.read_sql_table('fittings_doctrine_fittings', conn)
+        df2 = pd.read_sql_table('fittings_doctrine', conn)
+    df.rename(columns={'fitting_id': 'fit_id'}, inplace=True)
+    df2.rename(columns={'id': 'doctrine_id'}, inplace=True)
+    print(df2.columns)
+    df3 = target_df.merge(df, on='fit_id', how='left')
+    df4 = df3.merge(df2, on='doctrine_id', how='left')
+    return df4
 
-    c = 0
-    dfs = []
-    for id in target_ids:
-        df = target_df[target_df['fit_id'] == id]
-        df2 = df[df['fits_on_market'] < target]
-        dfs.append(df2)
-        print(f'\rparsing fit {c} of {len(target_ids)}', end='')
-        c += 1
-    short_df = pd.concat(dfs, ignore_index=True)
-
-    summary_df = target_df.groupby('fit_id').agg({
-        'fits_on_market': 'min',
-        'doctrine_name': 'first'
-    }).reset_index()
-    return short_df, target_df, summary_df
 
 def read_doctrine_watchlist(db_name: str = 'wc_fitting') -> list:
     try:
@@ -199,7 +190,7 @@ def clean_doctrine_columns(df: pd.DataFrame) -> pd.DataFrame:
     print(df.columns)
     # df = df.drop(columns=["doctrine_id", "ship_type_id"])
     doctrines = get_doctrine_fits()
-    doctrines = doctrines.rename(columns={'name': 'doctrine_name', 'id': 'doctrine_id'})
+    doctrines = doctrines.rename(columns={'name': 'doctrine_name', 'id': 'fit_id'})
     doctrines.drop('type_name', inplace=True, axis=1)
 
     merged_df = df.merge(doctrines, on='doctrine_name', how='left')
@@ -213,6 +204,3 @@ def clean_doctrine_columns(df: pd.DataFrame) -> pd.DataFrame:
 
 if __name__ == "__main__":
     pass
-
-    # query = f"SELECT id, name FROM {table_name}"
-    # df = pd.read_sql_query(query, engine)

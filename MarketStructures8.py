@@ -10,7 +10,6 @@ from pandas.core.interchange.dataframe_protocol import DataFrame
 from requests import ReadTimeout
 
 import db_handler as dbhandler
-import doctrine_monitor
 import sql_handler
 import google_sheet_updater
 from ESI_OAUTH_FLOW import get_token
@@ -18,7 +17,7 @@ from file_cleanup import rename_move_and_archive_csv
 from get_jita_prices import get_jita_prices
 from logging_tool import configure_logging
 from sql_handler import process_esi_market_order_optimized
-from doctrine_monitor import read_doctrine_watchlist, read_market_orders, get_doctrine_status
+from doctrine_monitor import read_doctrine_watchlist, get_doctrine_status_optimized
 
 # GNU General Public License
 #
@@ -90,13 +89,17 @@ def fetch_market_orders():
     logger.info("fetching orders...")  # Track status
 
     while page <= max_pages:
-        print(f"\rFetching page {page}...", end="")
         response = requests.get(MARKET_STRUCTURE_URL + str(page), headers=headers)
 
         if "X-Pages" in response.headers:
             max_pages = int(response.headers["X-Pages"])
         elif response.status_code == 200:
             max_pages = 1
+
+        page_ratio: float = page / max_pages
+        page_ratio_rounded: int = round(page_ratio * 100)
+        page_ratio_rounded_str: str = str(page_ratio_rounded) + "%"
+        print(f"\rFetching market order pages pages {page_ratio_rounded_str}...", end="")
 
         # make sure we don't hit the error limit and get our IP banned
         errorsleft = int(response.headers.get("X-ESI-Error-Limit-Remain", 0))
@@ -156,14 +159,7 @@ def fetch_market_orders():
         json.dumps(all_orders)
 
     logger.info(
-        f"done. successfully retrieved {len(all_orders)}. connecting to database...")
-
-    print("""
-    ---------------------
-    Checking doctrines
-    ----------------------
-    """)
-    logger.info(f'returning all orders')
+        f"done. successfully retrieved {len(all_orders)}...")
     return all_orders
 
 # update market history
@@ -188,17 +184,26 @@ def fetch_market_history(fresh_data: bool == True) -> pd.DataFrame:
 
         logger.info('fetching market history for 4-HWWF')
         # Iterate over watchlist to fetch market history for 4-HWWF
-        for type_id in range(len(type_id_list)):
+
+        total_items = len(type_id_list)
+
+        for type_id in range(total_items):
             while page <= max_pages:
                 item = type_id_list[type_id]
-                print(
-                    f"\ritems retrieved: {successful_returns}/{len(type_id_list)}", end=""
-                )
+                # print(
+                #     f"\ritems retrieved: {successful_returns}/{total_items}", end=""
+                # )
 
                 try:
                     response = requests.get(
                         market_history_url + str(item), headers=headers, timeout=timeout
                     )
+
+                    item_ratio: float = successful_returns / total_items
+                    item_ratio_rounded: int = round(item_ratio * 100)
+                    item_ratio_rounded_str: str = str(item_ratio_rounded) + "%"
+                    print(f"\rFetching history {item_ratio_rounded_str}...", end="")
+
                     page += 1
 
                     if "X-Pages" in response.headers:
@@ -334,28 +339,10 @@ def history_merge(history_data: pd.DataFrame) -> pd.DataFrame:
     return grouped_historical_df
 
 def update_doctrine_status(target: int = 20):
-    short_df, target_df, summary_df = get_doctrine_status(target=target)
-    cleaned_short_df = doctrine_monitor.clean_doctrine_columns(short_df)
-    cleaned_target_df = doctrine_monitor.clean_doctrine_columns(target_df)
-
-    print(f"""
-        Retrieved Data for Doctrine Fits
-        --------------------------------
-        Items in short supply:  {len(short_df['type_id'].unique())}
-        Items in target supply: {len(target_df['type_id'].unique())}
-        Analyzed fits for: {len(summary_df['fit_id'].unique())}
-        """
-          )
-    sql_handler.update_short_items(cleaned_short_df)
-    sql_handler.update_doctrine_items(cleaned_target_df)
-    google_sheet_updater.google_sheet_updater_short()
-    google_sheet_updater.google_sheet_updater_doctrine_items()
-    cleaned_short_df.to_csv("output/latest/short_doctrines.csv", index=False)
-    cleaned_target_df.to_csv("output/latest/target_doctrines.csv", index=False)
-    summary_df.to_csv("output/latest/summary_doctrines.csv", index=False)
+    target_df = get_doctrine_status_optimized(target=target)
+    google_sheet_updater.google_sheet_updater_doctrine_items(target_df)
+    target_df.to_csv("output/latest/target_doctrines.csv", index=False)
     print("Completed doctrines check")
-
-    return short_df, target_df, summary_df
 
 def process_orders(market_orders, history_data):
 
@@ -370,7 +357,6 @@ def process_orders(market_orders, history_data):
     logging.info("getting jita prices")
     vale_jita = get_jita_prices(final_data)
     return vale_jita, final_data
-
 
 def save_data(history: DataFrame, vale_jita: DataFrame, final_data: DataFrame, fresh_data: bool = True):
     update_time = datetime.now()
@@ -453,13 +439,14 @@ if __name__ == "__main__":
     logger.info("processing orders")
     vale_jita, final_data = process_orders(market_orders, historical_df)
     # check doctrine market status
+
+    save_data(historical_df, vale_jita, final_data, fresh_data_choice)
+
     print("DOCTRINE CHECKS")
     logger.info('Checking doctrines')
     # =========================================
     update_doctrine_status()
     # =========================================
-    save_data(historical_df, vale_jita, final_data, fresh_data_choice)
-
     # Completed stats
     finish_time = datetime.now()
     total_time = finish_time - start_time
