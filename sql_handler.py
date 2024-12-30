@@ -178,6 +178,29 @@ class Doctrine_Items(Base):
     timestamp: Mapped[datetime] = mapped_column(DateTime, nullable=True)
 
 
+class MarketBasket(Base):
+    __tablename__ = "MarketBasket"
+
+    type_id: Mapped[int] = mapped_column(Integer)
+    date: Mapped[datetime] = mapped_column(DateTime)
+    buy_price_low: Mapped[float] = mapped_column(Float)
+    buy_price_avg: Mapped[float] = mapped_column(Float)
+    buy_price_high: Mapped[float] = mapped_column(Float)
+    sell_price_low: Mapped[float] = mapped_column(Float)
+    sell_price_avg: Mapped[float] = mapped_column(Float)
+    sell_price_high: Mapped[float] = mapped_column(Float)
+    buy_volume_low: Mapped[int] = mapped_column(Integer)
+    buy_volume_avg: Mapped[int] = mapped_column(Integer)
+    buy_volume_high: Mapped[int] = mapped_column(Integer)
+    sell_volume_low: Mapped[int] = mapped_column(Integer)
+    sell_volume_avg: Mapped[int] = mapped_column(Integer)
+    sell_volume_high: Mapped[int] = mapped_column(Integer)
+    ore: Mapped[str] = mapped_column(String(100))
+    qty: Mapped[int] = mapped_column(Integer)
+
+    __table_args__ = (PrimaryKeyConstraint("date", "type_id"),)
+
+
 def process_dataframe(
         df: pl.DataFrame, columns: list, date_column: str = None
 ) -> pl.DataFrame:
@@ -569,7 +592,6 @@ def fill_missing_stats() -> str:
         print(f"Error occurred: {str(e)}")
         raise
 
-
 def update_short_items(df: pd.DataFrame) -> str:
     # process the df
     df = df.fillna("").replace([float('inf'), float('-inf')], 0)
@@ -871,6 +893,14 @@ def validate_dataframe(df: pd.DataFrame):
 
     return validated_data, errors
 
+
+def update_market_basket(df: pd.DataFrame) -> str:
+    sql_logger.info("Updating market basket...")
+    engine = create_engine(mkt_sqlfile, echo=True)
+    with engine.connect() as conn:
+        df.to_sql('MarketBasket', con=conn, if_exists='append', index=False, chunksize=1000)
+    engine.dispose()
+    return "Market basket loading completed successfully!"
 
 if __name__ == "__main__":
     pass
