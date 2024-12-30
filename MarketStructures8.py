@@ -6,18 +6,16 @@ from datetime import datetime
 
 import pandas as pd
 import requests
-from pandas import DataFrame
 from pandas.core.interchange.dataframe_protocol import DataFrame
 from requests import ReadTimeout
 
 import google_sheet_updater
-import sql_handler
 from ESI_OAUTH_FLOW import get_token
 from doctrine_monitor import read_doctrine_watchlist, get_doctrine_status_optimized
 from file_cleanup import rename_move_and_archive_csv
 from get_jita_prices import get_jita_prices
 from logging_tool import configure_logging
-from sql_handler import process_esi_market_order_optimized
+from sql_handler import process_esi_market_order_optimized, read_sql_watchlist, read_history, update_stats2
 
 # GNU General Public License
 #
@@ -164,7 +162,7 @@ def fetch_market_orders():
 
 # update market history
 def fetch_market_history(fresh_data: bool == True) -> pd.DataFrame:
-    watchlist = sql_handler.read_sql_watchlist()
+    watchlist = read_sql_watchlist()
     type_id_list = watchlist["type_id"].unique().tolist()
 
     if fresh_data:
@@ -250,7 +248,7 @@ def fetch_market_history(fresh_data: bool == True) -> pd.DataFrame:
 
     else:
         logger.info('retrieving cached market history data')
-        historical_df = sql_handler.read_history(30)
+        historical_df = read_history(30)
         all_history = None
 
     logger.info(f"history data complete. {len(historical_df)} records retrieved.")
@@ -266,7 +264,7 @@ def aggregate_sell_orders(market_orders_json: any) -> pd.DataFrame:
 
     orders = pd.DataFrame(market_orders_json)
 
-    ids = sql_handler.read_sql_watchlist()
+    ids = read_sql_watchlist()
     ids = ids["type_id"].tolist()
 
     filtered_orders = orders[orders["type_id"].isin(ids)]
@@ -372,7 +370,7 @@ def save_data(history: DataFrame, vale_jita: DataFrame, final_data: DataFrame, f
     final_data.to_csv(market_stats_filename, index=False)
 
     logger.info(print('saving market stats to database'))
-    status = sql_handler.update_stats2(final_data)
+    status = update_stats2(final_data)
     logger.info(print(status))
     google_sheet_updater.google_sheet_updater()
     # save a copy of market stats to update spreadsheet consistently named
@@ -403,7 +401,7 @@ if __name__ == "__main__":
 
     # retrieve current watchlist from database
     logger.info(f"reading watchlist from database")
-    watchlist = sql_handler.read_sql_watchlist()
+    watchlist = read_sql_watchlist()
     doctrine_watchlist = read_doctrine_watchlist('wc_fitting')
     logger.info(f"retrieved {len(watchlist)} type_ids. watchlist is:  {type(watchlist)}")
 

@@ -421,6 +421,7 @@ def read_history(doys: int = 30) -> pd.DataFrame:
     return historydf
 
 
+# noinspection SqlWithoutWhere
 def update_current_orders(df: pl.DataFrame) -> str:
     df_processed = insert_type_names(df)
     records = df_processed.to_dicts()
@@ -521,6 +522,7 @@ def update_stats(df: pd.DataFrame) -> str:
             return "Stats loading completed successfully!"
 
 
+# noinspection SqlWithoutWhere
 def update_stats2(df: pd.DataFrame) -> str:
     df = df.infer_objects()
     df = df.fillna(0)
@@ -549,7 +551,6 @@ def update_stats2(df: pd.DataFrame) -> str:
     except Exception as e:
         print(f"Error occurred: {str(e)}")
         raise
-
 
 def fill_missing_stats() -> str:
     stats = read_sql_market_stats()
@@ -647,7 +648,6 @@ def update_short_items(df: pd.DataFrame) -> str:
             raise
 
     return "Short items loading completed successfully!"
-
 
 def update_short_items_optimized(df: pd.DataFrame) -> str:
     # process the df
@@ -879,7 +879,6 @@ def read_sql_market_stats() -> pd.DataFrame:
         df = pd.read_sql_table('Market_Stats', conn)
     return df
 
-
 def validate_dataframe(df: pd.DataFrame):
     validated_data = []
     errors = []
@@ -892,7 +891,6 @@ def validate_dataframe(df: pd.DataFrame):
             errors.append((index, str(e)))
 
     return validated_data, errors
-
 
 def update_market_basket(df: pd.DataFrame) -> str:
     sql_logger.info("Updating market basket...")

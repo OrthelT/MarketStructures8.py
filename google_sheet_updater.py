@@ -4,8 +4,8 @@ import gspread
 import pandas as pd
 from google.oauth2.service_account import Credentials
 
-import sql_handler
 from logging_tool import configure_logging
+from sql_handler import read_sql_market_stats
 
 logger = configure_logging(
     "google_sheet_updater",
@@ -29,7 +29,7 @@ def get_credentials(SCOPES: list):
 def google_sheet_updater() -> str:
     gc = get_credentials(SCOPES)
 
-    df = sql_handler.read_sql_market_stats()
+    df = read_sql_market_stats()
     new_cols = ['type_id', 'type_name', 'days_remaining', 'total_volume_remain', 'price_5th_percentile',
                 'avg_daily_volume', 'avg_of_avg_price', 'min_price', 'group_name', 'category_name',
                 'group_id', 'category_id', 'timestamp']
