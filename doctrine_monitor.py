@@ -8,15 +8,14 @@ from sqlalchemy import exc, create_engine
 mkt_sqlfile = "sqlite:///market_orders.sqlite"
 fit_mysqlfile = "mysql+pymysql://Orthel:Dawson007!27608@localhost:3306/wc_fitting"
 
-logger = logging.getLogger('logger.doctrine_monitor')
+logger = logging.getLogger('mkt_structures.doctrine_monitor')
 
 def get_doctrine_fits(db_name: str = 'wc_fitting') -> pd.DataFrame:
-    ('accessing_db')
-    print('------------------------')
+    logger.info('accessing_db')
     mysql_connection = f"mysql+mysqlconnector://Orthel:Dawson007!27608@localhost:3306/{db_name}"
     engine = sqlalchemy.create_engine(mysql_connection)
-    print('MySql db connection established')
-    print('accessing doctrines...')
+    logger.info('MySql db connection established')
+    logger.info('accessing doctrines...')
     table_name = 'watch_doctrines'
 
     query = f"SELECT id, name FROM {table_name}"
@@ -123,7 +122,7 @@ def get_doctrine_status_optimized(target: int = 20) -> pd.DataFrame:
         df2 = pd.read_sql_table('fittings_doctrine', conn)
     df1.rename(columns={'fitting_id': 'fit_id'}, inplace=True)
     df2.rename(columns={'id': 'doctrine_id'}, inplace=True)
-    print(df2.columns)
+
     df3 = target_df.merge(df1, on='fit_id', how='left')
     df4 = df3.merge(df2, on='doctrine_id', how='left')
 
@@ -179,13 +178,13 @@ def read_doctrine_watchlist(db_name: str = 'wc_fitting') -> list:
             return id_list
 
     except exc.OperationalError as e:
-        print(f"Database connection error: {str(e)}")
+        logger.warning(f"Database connection error: {str(e)}")
         return []
     except exc.ProgrammingError as e:
-        print(f"SQL query error: {str(e)}")
+        logger.warning(f"SQL query error: {str(e)}")
         return []
     except Exception as e:
-        print(f"Unexpected error: {str(e)}")
+        logger.warning(f"Unexpected error: {str(e)}")
         return []
     finally:
         if 'engine' in locals():

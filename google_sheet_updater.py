@@ -4,13 +4,9 @@ import gspread
 import pandas as pd
 from google.oauth2.service_account import Credentials
 
-from logging_tool import configure_logging
 from sql_handler import read_sql_market_stats
 
-logger = configure_logging(
-    "google_sheet_updater",
-    "logs/google_sheet_updater.log")
-logger.addHandler(logging.StreamHandler())
+logger = logging.getLogger('mkt_structures.google_sheet_updater')
 
 SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets",

@@ -1,4 +1,6 @@
 import json
+import logging
+from datetime import datetime, timedelta
 
 import pandas as pd
 import requests
@@ -11,8 +13,10 @@ basket_ids = df.type_id.to_list()
 ids = basket_ids[:6]
 ids = [int(x) for x in ids]
 
+logger = logging.getLogger('mkt_structures.get_jita_prices')
 
 def get_jita_prices(vale_data):
+    logger.info('getting jita prices')
     regionid = '10000002'
     base_url = 'https://market.fuzzwork.co.uk/aggregates/?region='
     ids = vale_data['type_id'].to_list()
@@ -20,8 +24,11 @@ def get_jita_prices(vale_data):
     url = f'{base_url}{regionid}&types={ids_str}'
     response = requests.get(url)
     data = response.json()
+    logger.info('got jita prices. parsing json')
     jita_data = parse_json(data)
+    logger.info('merging data')
     merged_df = merge_vale_data(jita_data, vale_data)
+    logger.info('done. returning merged_df')
     return merged_df
 
 def merge_vale_data(jita_data, vale_data):
@@ -34,11 +41,13 @@ def merge_vale_data(jita_data, vale_data):
     merged_df = merged_df[['type_id', 'type_name', 'total_volume_remain', 'price_5th_percentile',
                            'avg_of_avg_price', 'avg_daily_volume', 'group_id', 'jita_sell', 'jita_buy',
                            'group_name', 'category_id', 'category_name']]
+    logger.info('vale and jita data merged. returning merged_df to get_jita_prices()')
     return merged_df
 
 def parse_json(data) -> pd.DataFrame:
     # Prepare data for DataFrame
     rows = []
+    logger.info('processing json data')
     for item_id, item_data in data.items():
 
         buy_data = item_data.get("buy", {})
@@ -53,13 +62,16 @@ def parse_json(data) -> pd.DataFrame:
     df = pd.DataFrame(rows)
     df['jita_sell'] = df['jita_sell'].round(2)
     df['jita_buy'] = df['jita_buy'].round(2)
-
+    logger.info('json data processed, returning df')
     return df
 
 
 def get_jita_history(type_ids: list):
     start_date = '2024-01-01'
-    end_date = '2024-12-29'
+    # Calculate yesterday's date
+    yesterday = datetime.now() - timedelta(days=1)
+    end_date = yesterday.strftime('%Y-%m-%d')
+
 
     base_url = 'https://api.adam4eve.eu/v1/market_price_history?typeID='
     start = '&start=' + start_date
@@ -85,13 +97,14 @@ def get_jita_history(type_ids: list):
     ]
     df[volume_columns] = df[volume_columns].astype(int)
     df[price_columns] = df[price_columns].astype(float).round(2)
-
     df.to_csv('data/mining_basket_history.csv', index=False)
+    logger.info('saved mining basket history to csv. returning df')
 
     return df
 
 
 def process_market_basket():
+    logger.info('processing market basket')
     df1 = pd.read_csv('data/mining_basket.csv')
     df2 = pd.read_csv('data/mining_basket_history.csv')
     df1 = df1.infer_objects()
@@ -99,21 +112,21 @@ def process_market_basket():
     df1.reset_index(drop=True, inplace=True)
     df1['type_id'] = df1['type_id'].astype(int)
     df1.rename(columns={'Ore': 'ore', 'Qty': 'qty'}, inplace=True)
-    print(df1.head())
+
     df1['ore'] = df1['ore'].astype(str)
     # df1['qty'] = df1['qty'].apply(lambda x: int(x.strip().replace(',', '')))
     df3 = df2.merge(df1, on='type_id')
     df3['price_date'] = pd.to_datetime(df3['price_date'])
     df3['ore'] = df3['ore'].str.lower()
-    print(df3.columns)
+
     df3['mined_value'] = df3.apply(lambda row: row['sell_price_avg'] * row['qty'], axis=1)
     df3 = df3[['price_date', 'ore', 'sell_price_avg', 'mined_value']]
     df3.to_csv('data/mined_items_by_day.csv', index=False)
     df = df3.copy()
     df_grouped = df.groupby('price_date').mined_value.sum()
     df_grouped = df_grouped.reset_index()
-    print(df_grouped.head())
     df_grouped.to_csv('data/mined_value_by_day.csv', index=False)
+    logger.info('saved market basket data to csv and returning df_grouped')
     return df_grouped
 
 if __name__ == "__main__":

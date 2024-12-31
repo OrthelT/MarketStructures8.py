@@ -4,12 +4,12 @@ from typing import List
 
 import pandas as pd
 import polars as pl
-from sqlalchemy import (create_engine, String, Integer, text, Table, MetaData, Column)
-from sqlalchemy.orm import declarative_base, sessionmaker
+from sqlalchemy import (create_engine, text)
+from sqlalchemy.orm import declarative_base
 
-from models import (Doctrine_Items, MarketStats)
+from models import (MarketStats)
 
-sql_logger = logging.getLogger('logger.sql_handler')
+sql_logger = logging.getLogger('mkt_structures.sql_handler')
 
 sql_file = "market_orders.sqlite"
 mkt_sqlfile = "sqlite:///market_orders.sqlite"
@@ -52,26 +52,7 @@ stats_columns = [
 ]
 
 
-def process_dataframe(
-        df: pl.DataFrame, columns: list, date_column: str = None
-) -> pl.DataFrame:
-    """Process the dataframe by selecting columns and converting dates."""
-    # Select only the specified columns
-    df = df.select(columns)
-    if date_column is None:
-        if "date" in df.columns:
-            date_column = "date"
-        elif "issued" in df.columns:
-            date_column = "issued"
-        else:
-            date_column = None
-    # Convert  date strings to datetime objects
-    if date_column:
-        df = df.with_columns(
-            [pl.col(date_column).str.strptime(pl.Datetime).alias(date_column)]
-        )
-    df = insert_timestamp(df)
-    return df
+
 
 
 def process_pd_dataframe(
@@ -153,7 +134,7 @@ def insert_pd_timestamp(df: pd.DataFrame) -> pd.DataFrame:
     # detect if timestamp already exists
     if 'timestamp' in df2.columns:
         if pd.api.types.is_datetime64_any_dtype(df2['timestamp']):
-            print('timestamp exists')
+            sql_logger.info('timestamp exists')
             return df2
         else:
             df2.drop(columns=['timestamp'], inplace=True)
@@ -181,11 +162,11 @@ def process_esi_market_order_optimized(data: List[dict], is_history: bool = Fals
         try:
             status = update_orders(df)
         except Exception as e:
-            print(f"Error updating orders: {str(e)}")
+            sql_logger.warning(f"Error updating orders: {str(e)}")
             status = f"Error updating orders: {str(e)}"
             raise
-
-    return f"{status} Doctrine items loading completed successfully!"
+    sql_logger.info(print("{status} Doctrine items loading completed successfully!"))
+    return status
 
 
 def update_history(df: pd.DataFrame) -> str:
@@ -255,7 +236,7 @@ def read_history(doys: int = 30) -> pd.DataFrame:
 
     # Create a session factoryf
     session = engine.connect()
-    print(f'connection established: {session} by sql_handler.read_history()')
+    sql_logger.info(f'connection established: {session} by sql_handler.read_history()')
     d = f"'-{doys} days'"
 
     stmt = f"""
@@ -264,11 +245,10 @@ def read_history(doys: int = 30) -> pd.DataFrame:
 
     historydf = pd.read_sql(stmt, session)
     session.close()
-    print(f'connection closed: {session}...returning orders from market_history table.')
+    sql_logger.info(f'connection closed: {session}...returning orders from market_history table.')
     return historydf
 
 
-# noinspection SqlWithoutWhere
 def update_current_orders(df: pl.DataFrame) -> str:
     df_processed = insert_type_names(df)
     records = df_processed.to_dicts()
@@ -290,7 +270,7 @@ def update_current_orders(df: pl.DataFrame) -> str:
             conn.execute(text(clear_table))
             conn.commit()
         except Exception as e:
-            print(f"Error clearing table: {str(e)}")
+            sql_logger.error(f"Error clearing table: {str(e)}")
             raise
 
         try:
@@ -298,17 +278,13 @@ def update_current_orders(df: pl.DataFrame) -> str:
                 batch = records[i: i + batch_size]
                 conn.execute(text(current_statement), batch)
                 conn.commit()
-                print(
-                    f"\rProcessed records {i} to {min(i + batch_size, len(records))}",
-                    end="",
-                )
+                sql_logger.info(f"Processed records {i} to {min(i + batch_size, len(records))}")
         except Exception as e:
-            print(f"Error inserting data: {str(e)}")
+            sql_logger.error(print("Error inserting data: {str(e)}"))
             raise
 
     return status
 
-# noinspection SqlWithoutWhere
 def update_stats(df: pd.DataFrame) -> str:
     df = df.infer_objects()
     df = df.fillna(0)
@@ -335,7 +311,7 @@ def update_stats(df: pd.DataFrame) -> str:
         status = status + missing_status
         return status
     except Exception as e:
-        print(f"Error occurred: {str(e)}")
+        sql_logger.error(f"Error occurred: {str(e)}")
         raise
 
 def fill_missing_stats() -> str:
@@ -376,7 +352,7 @@ def fill_missing_stats() -> str:
                               )
         return "missing Stats loading completed successfully!"
     except Exception as e:
-        print(f"Error occurred: {str(e)}")
+        sql_logger.error(f"Error occurred: {str(e)}")
         raise
 
 def update_short_items_optimized(df: pd.DataFrame) -> str:
@@ -405,152 +381,15 @@ def read_short_items() -> pd.DataFrame:
 
     return df
 
-def create_joined_invtypes_table():
-    sql_logger.info("Creating joined_invtypes table...")
-    # Define SQLite and MySQL database URIs
-    sqlite_uri = f"sqlite:///{mkt_sqlfile}"
-    mysql_uri = f"mysql+pymysql://{fit_sqlfile}"
-
-    # Create engines for both databases
-    sqlite_engine = create_engine(sqlite_uri, echo=False)
-    mysql_engine = create_engine(mysql_uri, echo=False)
-
-    # Reflect the SQLite database schema
-    metadata = MetaData()
-    sqlite_table = Table(
-        "JoinedInvTypes",
-        metadata,
-        Column("typeID", Integer),
-        Column("groupID", Integer),
-        Column("typeName", String(255)),  # Updated to include length
-        Column("groupName", String(255)),  # Updated to include length
-        Column("categoryID", Integer),
-        Column("categoryID_2", Integer),
-        Column("categoryName", String(255)),  # Updated to include length
-        Column("metaGroupID", Integer),
-        Column("metaGroupID_2", Integer),
-        Column("metaGroupName", String(255)),  # Updated to include length
-    )
-
-    # Define the same table in MySQL
-    mysql_metadata = MetaData()
-    mysql_table = Table(
-        "JoinedInvTypes",
-        mysql_metadata,
-        Column("typeID", Integer),
-        Column("groupID", Integer),
-        Column("typeName", String(255)),  # Updated to include length
-        Column("groupName", String(255)),  # Updated to include length
-        Column("categoryID", Integer),
-        Column("categoryID_2", Integer),
-        Column("categoryName", String(255)),  # Updated to include length
-        Column("metaGroupID", Integer),
-        Column("metaGroupID_2", Integer),
-        Column("metaGroupName", String(255)),  # Updated to include length
-    )
-
-    # Create the table in MySQL
-    mysql_metadata.create_all(mysql_engine)
-
-    # Transfer data from SQLite to MySQL
-    SessionSQLite = sessionmaker(bind=sqlite_engine)
-    SessionMySQL = sessionmaker(bind=mysql_engine)
-
-    sqlite_session = SessionSQLite()
-    mysql_session = SessionMySQL()
-
-    try:
-        # Fetch all data from the SQLite table
-        # Reflect and map the table explicitly
-        sqlite_table = metadata.tables.get("JoinedInvTypes")
-
-        # Fetch all rows from the table
-        data = sqlite_session.execute(sqlite_table.select()).fetchall()
-
-        # Insert data into the MySQL table
-        for row in data:
-            insert_data = {
-                "typeID": row.typeID,
-                "groupID": row.groupID,
-                "typeName": row.typeName,
-                "groupName": row.groupName,
-                "categoryID": row.categoryID,
-                "categoryID_2": row.categoryID_2,
-                "categoryName": row.categoryName,
-                "metaGroupID": row.metaGroupID,
-                "metaGroupID_2": row.metaGroupID_2,
-                "metaGroupName": row.metaGroupName,
-            }
-            mysql_session.execute(mysql_table.insert().values(insert_data))
-
-        # Commit changes to MySQL
-        mysql_session.commit()
-        print("Data transfer completed successfully!")
-    except Exception as e:
-        mysql_session.rollback()
-        print(f"An error occurred: {e}")
-    finally:
-        sqlite_session.close()
-        mysql_session.close()
 
 
-def update_doctrine_items(df: pd.DataFrame) -> str:
-    # process the df
-    df_pl = pl.from_pandas(df)
-    df_processed = insert_timestamp(df_pl)
-    df_pl.fill_null(0)
-    records = df_processed.to_dicts()
-    # start a session
-    engine = create_engine(f"sqlite:///market_orders.sqlite", echo=False)
-    Session = sessionmaker(bind=engine)
 
-    with Session() as session:  # Corrected the session instantiation
-        try:
 
-            # Clear the table
-            session.query(Doctrine_Items).delete()
-            session.commit()
-            print("Table cleared")
-
-            # Insert new records
-            batch_size = 1000
-            for i in range(0, len(records), batch_size):
-                batch = records[i:i + batch_size]
-                doctrine_objects = [
-                    Doctrine_Items(
-                        fit_id=record["fit_id"],
-                        doctrine_name=record["doctrine_name"],
-                        type_id=record["type_id"],
-                        type_name=record["type_name"],
-                        quantity=record["quantity"],
-                        volume_remain=record["volume_remain"],
-                        price=record["price"],
-                        fits_on_market=record["fits_on_market"],
-                        delta=record["delta"],
-                        doctrine_id=record["doctrine_id"],
-                        ship_type_id=record["ship_type_id"],
-                        timestamp=record["timestamp"]
-                    )
-
-                    for record in batch
-                ]
-                session.add_all(doctrine_objects)
-                session.commit()
-
-                print(
-                    f"\rProcessed records {i} to {min(i + batch_size, len(records))}",
-                    end="",
-                )
-        except Exception as e:
-            session.rollback()
-            print(f"Error occurred: {str(e)}")
-            raise
-
-    return "Doctrine items loading completed successfully!"
 
 
 def optimize_for_bulk_update(engine):
     # Optimize database settings for bulk insert
+    sql_logger.info('optimizing for bulk update')
     with engine.begin() as conn:
         conn.execute(text("PRAGMA synchronous = OFF;"))
         conn.execute(text("PRAGMA journal_mode = MEMORY;"))

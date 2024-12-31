@@ -343,8 +343,7 @@ def update_doctrine_status(target: int = 20):
     status = google_sheet_updater.google_sheet_updater_doctrine_items(target_df)
     logger.info(status)
     target_df.to_csv("output/latest/target_doctrines.csv", index=False)
-    print("Completed doctrines check")
-
+    logger.info(print("Completed doctrines check"))
 
 def process_orders(market_orders, history_data) -> tuple[DataFrame, DataFrame]:
     logger.info("aggregating sell orders")
@@ -353,7 +352,7 @@ def process_orders(market_orders, history_data) -> tuple[DataFrame, DataFrame]:
     logger.info("merging historical data")
     final_data = merge_market_stats(merged_sell_orders, history_data)
 
-    print(type(final_data))
+    logger.info(type(final_data))
     logger.info("getting jita prices")
     vale_jita = get_jita_prices(final_data)
     return vale_jita, final_data
