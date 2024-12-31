@@ -204,4 +204,23 @@ def clean_doctrine_columns(df: pd.DataFrame) -> pd.DataFrame:
     return updated_merged_df
 
 if __name__ == "__main__":
-    pass
+    df = get_doctrine_status_optimized()
+
+    drop_cols = ['icon_url', 'description', 'created', 'last_updated', 'id', 'min_price']
+    df.drop(columns=drop_cols, inplace=True)
+    df.reset_index(drop=True, inplace=True)
+
+    renamed_cols = {'name': 'doctrine', 'ship_type_name': 'ship', 'ship_type_id': 'ship id', 'fit_name': 'fit',
+                    'total_volume_remain': 'stock', 'price_5th_percentile': '4H price',
+                    'avg_of_avg_price': 'avg price', 'avg_daily_volume': 'avg vol', 'group_id': 'grp id',
+                    'group_name': 'group', 'category_id': 'cat_id', 'category_name': 'category',
+                    'days_remaining': 'days', 'fits_on_market': 'fits', 'doctrine_id': 'doc id',
+                    'type_name': 'item', 'fit_id': 'fit id', 'type_id': 'type id'}
+
+    df.rename(columns=renamed_cols, inplace=True)
+
+    reordered_cols = ['fit id', 'type id', 'category', 'item', 'quantity', 'fit', 'ship', 'stock', 'fits',
+                      'days', '4H price', 'avg vol', 'avg price', 'delta', 'doctrine', 'group', 'cat_id',
+                      'grp id', 'doc id', 'ship id', 'timestamp']
+
+    df = df[reordered_cols]
