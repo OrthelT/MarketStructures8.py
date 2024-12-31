@@ -67,20 +67,7 @@ def google_sheet_updater() -> str:
 
 
 def google_sheet_updater_doctrine_items(df: pd.DataFrame) -> str:
-    # This function grabs items we have identified as being in short supply and posts to Google sheets.
-    # Read data from the SQL handler
-    # df = sql_handler.read_doctrine_items()
-    #
-    # new_cols = [
-    #     'type_id', 'type_name', 'fits_on_market', 'quantity',
-    #     'volume_remain', 'price',
-    #     'delta', 'id', 'fit_id', 'doctrine_name', 'timestamp']
-    # Ensure DataFrame columns are in the expected order
-    # df = df[new_cols]
-    # # Clean the DataFrame to ensure JSON compliance
-    # df = fill_na(df)
-    # Convert DataFrame to a list of lists (Google Sheets format)
-    df.drop(columns=['description', 'created'], inplace=True)
+
     data_list = [df.columns.tolist()] + df.astype(str).values.tolist()
     # access credentials to update Google sheets
     gc = get_credentials(SCOPES)
@@ -94,12 +81,11 @@ def google_sheet_updater_doctrine_items(df: pd.DataFrame) -> str:
         logger.info(clear)
         # Update the sheet with new data, starting at cell A1
         result = sheet.update(values=data_list, range_name='A1')
-        print(result)
+        logger.info(result)
         message = "Doctrine items data updated successfully!"
         logger.info(print(message, result))
     except Exception as e:
         message = f"An error occurred while updating doctrine items: {str(e)}"
-        print(message)
         logger.error(message)
         raise
     return message

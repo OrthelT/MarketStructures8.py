@@ -117,4 +117,4 @@ def process_market_basket():
     return df_grouped
 
 if __name__ == "__main__":
-    process_market_basket()
+    pass

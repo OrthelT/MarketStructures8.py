@@ -54,8 +54,7 @@ def get_fit_items(df: pd.DataFrame, id_list: list):
     cols = ['id', 'name', 'ship_type_id', 'type_name']
     df = df.rename({'id': 'fit_id', 'name': 'doctrine_name'}, axis="columns")
 
-    mysql_connection = f"mysql+mysqlconnector://Orthel:Dawson007!27608@localhost:3306/wc_fitting"
-    engine = sqlalchemy.create_engine(mysql_connection)
+    engine = sqlalchemy.create_engine(fit_mysqlfile)
 
     query = f"""
         SELECT fit_id, type_id, quantity 
@@ -63,6 +62,7 @@ def get_fit_items(df: pd.DataFrame, id_list: list):
     """
     with engine.connect() as conn:
         df2 = pd.read_sql_query(query, conn)
+
     df3 = df.merge(df2, on='fit_id', how='left')
     grouped_df = df3.groupby(['fit_id', 'type_id', 'doctrine_name', 'type_name', 'ship_type_id'])[
         'quantity'].sum().reset_index()
@@ -116,14 +116,42 @@ def get_doctrine_status_optimized(target: int = 20) -> pd.DataFrame:
 
     engine = create_engine(fit_mysqlfile)
     with engine.connect() as conn:
-        df = pd.read_sql_table('fittings_doctrine_fittings', conn)
+        df1 = pd.read_sql_table('fittings_doctrine_fittings', conn)
         df2 = pd.read_sql_table('fittings_doctrine', conn)
-    df.rename(columns={'fitting_id': 'fit_id'}, inplace=True)
+    df1.rename(columns={'fitting_id': 'fit_id'}, inplace=True)
     df2.rename(columns={'id': 'doctrine_id'}, inplace=True)
     print(df2.columns)
-    df3 = target_df.merge(df, on='fit_id', how='left')
+    df3 = target_df.merge(df1, on='fit_id', how='left')
     df4 = df3.merge(df2, on='doctrine_id', how='left')
-    return df4
+
+    df = df4.copy()
+
+    # old_cols = ['type_id', 'type_name', 'quantity', 'fit_name', 'ship_type_name','ship_type_id', 'fit_id',
+    #             'total_volume_remain', 'min_price', 'price_5th_percentile', 'avg_of_avg_price', 'avg_daily_volume',
+    #             'group_id', 'group_name', 'category_id', 'category_name', 'days_remaining', 'timestamp',
+    #             'fits_on_market', 'delta', 'id','doctrine_id', 'name', 'icon_url', 'description', 'created',
+    #             'last_updated']
+
+    drop_cols = ['icon_url', 'description', 'created', 'last_updated', 'id', 'min_price']
+    df.drop(columns=drop_cols, inplace=True)
+    df.reset_index(drop=True, inplace=True)
+
+    renamed_cols = {'name': 'doctrine', 'ship_type_name': 'ship', 'ship_type_id': 'ship id', 'fit_name': 'fit',
+                    'total_volume_remain': 'stock', 'price_5th_percentile': '4H price',
+                    'avg_of_avg_price': 'avg price', 'avg_daily_volume': 'avg vol', 'group_id': 'grp id',
+                    'group_name': 'group', 'category_id': 'cat id', 'category_name': 'category',
+                    'days_remaining': 'days', 'fits_on_market': 'fits', 'doctrine_id': 'doc id',
+                    'type_name': 'item', 'fit_id': 'fit id', 'type_id': 'type id', 'quantity': 'qty'}
+
+    df.rename(columns=renamed_cols, inplace=True)
+
+    reordered_cols = ['fit id', 'type id', 'category', 'fit', 'ship', 'item', 'qty', 'stock', 'fits',
+                      'days', '4H price', 'avg vol', 'avg price', 'delta', 'doctrine', 'group', 'cat id',
+                      'grp id', 'doc id', 'ship id', 'timestamp']
+
+    df = df[reordered_cols]
+
+    return df
 
 def read_doctrine_watchlist(db_name: str = 'wc_fitting') -> list:
     try:
@@ -170,9 +198,8 @@ def clean_doctrine_columns(df: pd.DataFrame) -> pd.DataFrame:
     merged_df = df.merge(doctrines, on='doctrine_name', how='left')
     print(merged_df.head())
 
-    new_cols = ['type_id', 'type_name', 'quantity',
-                'volume_remain', 'price', 'fits_on_market', 'delta', 'fit_id', 'doctrine_name', 'doctrine_id',
-                'ship_type_id']
+    new_cols = ['type_id', 'type_name', 'quantity', 'volume_remain', 'price', 'fits_on_market',
+                'delta', 'fit_id', 'doctrine_name', 'doctrine_id', 'ship_type_id']
     updated_merged_df = merged_df[new_cols]
     return updated_merged_df
 
