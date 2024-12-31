@@ -260,8 +260,6 @@ def fetch_market_history(fresh_data: bool == True) -> pd.DataFrame:
 # -----------------------------------------------
 def aggregate_sell_orders(market_orders_json: any) -> pd.DataFrame:
     logger.info("aggregating sell orders")
-    logger.info(f'market orders type:{type(market_orders_json)}')
-
     orders = pd.DataFrame(market_orders_json)
 
     ids = read_sql_watchlist()
@@ -289,25 +287,29 @@ def aggregate_sell_orders(market_orders_json: any) -> pd.DataFrame:
     return merged_df
 
 def merge_market_stats(merged_orders: pd.DataFrame, history_data: pd.DataFrame):
-
+    logger.info("merging historical data")
     grouped_historical_df = history_merge(history_data)
     grouped_historical_df['type_id'] = grouped_historical_df['type_id'].astype('int64')
 
     merged_data = pd.merge(
         merged_orders, grouped_historical_df, on="type_id", how="left"
     )
+
+    logger.info('filtering orders to watchlist')
     final_df = pd.merge(merged_data, watchlist, on="type_id", how="left")
 
+    logger.info('calculating days remaining')
     final_df["days_remaining"] = final_df.apply(
         lambda row: 0 if row["avg_daily_volume"] == 0 else row["total_volume_remain"] / row["avg_daily_volume"],
         axis=1
     )
-    final_df["days_remaining"] = final_df["days_remaining"].round(1)
 
+    final_df["days_remaining"] = final_df["days_remaining"].round(1)
+    logger.info('merge finished. returning final_df')
     return final_df
 
 def history_merge(history_data: pd.DataFrame) -> pd.DataFrame:
-    logging.info("processing historical data")
+    logger.info("processing historical data")
     historical_df = history_data
 
     historical_df["date"] = pd.to_datetime(historical_df["date"], errors="coerce")
@@ -334,13 +336,14 @@ def history_merge(history_data: pd.DataFrame) -> pd.DataFrame:
 
 def update_doctrine_status(target: int = 20):
     target_df = get_doctrine_status_optimized(target=target)
-    google_sheet_updater.google_sheet_updater_doctrine_items(target_df)
+    status = google_sheet_updater.google_sheet_updater_doctrine_items(target_df)
+    logger.info(status)
     target_df.to_csv("output/latest/target_doctrines.csv", index=False)
     print("Completed doctrines check")
 
-def process_orders(market_orders, history_data):
+
+def process_orders(market_orders, history_data) -> tuple[DataFrame, DataFrame]:
     logger.info("aggregating sell orders")
-    print(type(market_orders))
     merged_sell_orders = aggregate_sell_orders(market_orders)
 
     logger.info("merging historical data")
