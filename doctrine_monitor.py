@@ -1,4 +1,6 @@
 
+import logging
+
 import pandas as pd
 import sqlalchemy
 from sqlalchemy import exc, create_engine
@@ -6,9 +8,10 @@ from sqlalchemy import exc, create_engine
 mkt_sqlfile = "sqlite:///market_orders.sqlite"
 fit_mysqlfile = "mysql+pymysql://Orthel:Dawson007!27608@localhost:3306/wc_fitting"
 
+logger = logging.getLogger('logger.doctrine_monitor')
 
 def get_doctrine_fits(db_name: str = 'wc_fitting') -> pd.DataFrame:
-    print('accessing_db')
+    ('accessing_db')
     print('------------------------')
     mysql_connection = f"mysql+mysqlconnector://Orthel:Dawson007!27608@localhost:3306/{db_name}"
     engine = sqlalchemy.create_engine(mysql_connection)
@@ -189,14 +192,12 @@ def read_doctrine_watchlist(db_name: str = 'wc_fitting') -> list:
             engine.dispose()
 
 def clean_doctrine_columns(df: pd.DataFrame) -> pd.DataFrame:
-    print(df.columns)
     # df = df.drop(columns=["doctrine_id", "ship_type_id"])
     doctrines = get_doctrine_fits()
     doctrines = doctrines.rename(columns={'name': 'doctrine_name', 'id': 'fit_id'})
     doctrines.drop('type_name', inplace=True, axis=1)
 
     merged_df = df.merge(doctrines, on='doctrine_name', how='left')
-    print(merged_df.head())
 
     new_cols = ['type_id', 'type_name', 'quantity', 'volume_remain', 'price', 'fits_on_market',
                 'delta', 'fit_id', 'doctrine_name', 'doctrine_id', 'ship_type_id']
@@ -204,23 +205,4 @@ def clean_doctrine_columns(df: pd.DataFrame) -> pd.DataFrame:
     return updated_merged_df
 
 if __name__ == "__main__":
-    df = get_doctrine_status_optimized()
-
-    drop_cols = ['icon_url', 'description', 'created', 'last_updated', 'id', 'min_price']
-    df.drop(columns=drop_cols, inplace=True)
-    df.reset_index(drop=True, inplace=True)
-
-    renamed_cols = {'name': 'doctrine', 'ship_type_name': 'ship', 'ship_type_id': 'ship id', 'fit_name': 'fit',
-                    'total_volume_remain': 'stock', 'price_5th_percentile': '4H price',
-                    'avg_of_avg_price': 'avg price', 'avg_daily_volume': 'avg vol', 'group_id': 'grp id',
-                    'group_name': 'group', 'category_id': 'cat_id', 'category_name': 'category',
-                    'days_remaining': 'days', 'fits_on_market': 'fits', 'doctrine_id': 'doc id',
-                    'type_name': 'item', 'fit_id': 'fit id', 'type_id': 'type id'}
-
-    df.rename(columns=renamed_cols, inplace=True)
-
-    reordered_cols = ['fit id', 'type id', 'category', 'item', 'quantity', 'fit', 'ship', 'stock', 'fits',
-                      'days', '4H price', 'avg vol', 'avg price', 'delta', 'doctrine', 'group', 'cat_id',
-                      'grp id', 'doc id', 'ship id', 'timestamp']
-
-    df = df[reordered_cols]
+    pass

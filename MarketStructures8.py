@@ -3,6 +3,7 @@ import logging
 import os
 import time
 from datetime import datetime
+from typing import Any
 
 import pandas as pd
 import requests
@@ -15,7 +16,7 @@ from doctrine_monitor import read_doctrine_watchlist, get_doctrine_status_optimi
 from file_cleanup import rename_move_and_archive_csv
 from get_jita_prices import get_jita_prices
 from logging_tool import configure_logging
-from sql_handler import process_esi_market_order_optimized, read_sql_watchlist, read_history, update_stats2
+from sql_handler import process_esi_market_order_optimized, read_sql_watchlist, read_history, update_stats
 
 # GNU General Public License
 #
@@ -77,7 +78,6 @@ def fetch_market_orders():
     page = 1
     max_pages = 1
     tries = 0
-    total_tries = 0
     error_count = 0
     total_pages = 0
     all_orders = []
@@ -97,7 +97,7 @@ def fetch_market_orders():
         page_ratio: float = page / max_pages
         page_ratio_rounded: int = round(page_ratio * 100)
         page_ratio_rounded_str: str = str(page_ratio_rounded) + "%"
-        print(f"\rFetching market order pages pages {page_ratio_rounded_str}...", end="")
+        print(f"\rFetching market order pages pages {page_ratio_rounded_str}. Page: {page}", end="")
 
         # make sure we don't hit the error limit and get our IP banned
         errorsleft = int(response.headers.get("X-ESI-Error-Limit-Remain", 0))
@@ -161,9 +161,12 @@ def fetch_market_orders():
     return all_orders
 
 # update market history
-def fetch_market_history(fresh_data: bool == True) -> pd.DataFrame:
+def fetch_market_history(fresh_data: bool == True) -> tuple[DataFrame, list[Any] | None]:
     watchlist = read_sql_watchlist()
     type_id_list = watchlist["type_id"].unique().tolist()
+
+    # Create a lookup dictionary for type_names only used in status update....
+    type_id_to_name_map = watchlist.set_index('type_id')['type_name'].to_dict()
 
     if fresh_data:
         logging.info('fetching fresh data from ESI')
@@ -188,6 +191,7 @@ def fetch_market_history(fresh_data: bool == True) -> pd.DataFrame:
         for type_id in range(total_items):
             while page <= max_pages:
                 item = type_id_list[type_id]
+                type_name = type_id_to_name_map.get(item)
 
                 try:
                     response = requests.get(
@@ -196,7 +200,7 @@ def fetch_market_history(fresh_data: bool == True) -> pd.DataFrame:
                     item_ratio: float = successful_returns / total_items
                     item_ratio_rounded: int = round(item_ratio * 100)
                     item_ratio_rounded_str: str = str(item_ratio_rounded) + "%"
-                    print(f"\rFetching history {item_ratio_rounded_str}...({item})", end="")
+                    print(f"\rFetching history {item_ratio_rounded_str} :: ({item} - {type_name})", end="")
 
                     page += 1
 
@@ -373,7 +377,7 @@ def save_data(history: DataFrame, vale_jita: DataFrame, final_data: DataFrame, f
     final_data.to_csv(market_stats_filename, index=False)
 
     logger.info(print('saving market stats to database'))
-    status = update_stats2(final_data)
+    status = update_stats(final_data)
     logger.info(print(status))
     google_sheet_updater.google_sheet_updater()
     # save a copy of market stats to update spreadsheet consistently named

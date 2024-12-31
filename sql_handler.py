@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime, timezone
 from typing import List
 
@@ -6,12 +7,9 @@ import polars as pl
 from sqlalchemy import (create_engine, String, Integer, text, Table, MetaData, Column)
 from sqlalchemy.orm import declarative_base, sessionmaker
 
-from logging_tool import configure_logging
-from models import (Doctrine_Items, MarketStats, ShortItems)
+from models import (Doctrine_Items, MarketStats)
 
-sql_logger = configure_logging(
-    "sql_logger",
-    "logs/sql_logger.log")
+sql_logger = logging.getLogger('logger.sql_handler')
 
 sql_file = "market_orders.sqlite"
 mkt_sqlfile = "sqlite:///market_orders.sqlite"
@@ -121,7 +119,6 @@ def insert_type_names(df: pl.DataFrame) -> pl.DataFrame:
     )
     return df_named
 
-
 def insert_pd_type_names(df: pd.DataFrame) -> pd.DataFrame:
     engine = create_engine(mkt_sqlfile, echo=False)
 
@@ -132,11 +129,8 @@ def insert_pd_type_names(df: pd.DataFrame) -> pd.DataFrame:
     with engine.connect() as conn:
         result = conn.execute(text(match_type_ids))
         type_mappings = result.fetchall()
-        sql_logger.info(print(type_mappings[:10]))
-        sql_logger.info(print(f'type: {type(type_mappings)}'))
 
     names = pd.DataFrame(type_mappings, columns=['type_id', 'type_name'])
-    sql_logger.info(print(names))
 
     df2 = df.copy()
     df2 = df2.merge(names, on='type_id', how='left')
@@ -298,7 +292,6 @@ def update_current_orders(df: pl.DataFrame) -> str:
         except Exception as e:
             print(f"Error clearing table: {str(e)}")
             raise
-        print("table cleared")
 
         try:
             for i in range(0, len(records), batch_size):
@@ -313,70 +306,10 @@ def update_current_orders(df: pl.DataFrame) -> str:
             print(f"Error inserting data: {str(e)}")
             raise
 
-    status = "Data loading completed successfully!"
-
     return status
 
-
-def update_stats(df: pd.DataFrame) -> str:
-    df = df.infer_objects()
-    df = df.fillna(0)
-
-    df_processed = insert_pd_timestamp(df)
-
-    records = df_processed.to_dict()
-
-    # start a session
-    engine = create_engine(f"sqlite:///{sql_file}", echo=False)
-    Session = sessionmaker(bind=engine)
-
-    with Session() as session:  # Corrected the session instantiation
-        try:
-            # Clear the table
-            session.query(MarketStats).delete()
-            session.commit()
-            print("Table cleared")
-
-            # Insert new records
-            batch_size = 1000
-            for i in range(0, len(records), batch_size):
-                batch = records[i:i + batch_size]
-                stats_objects = [
-                    MarketStats(
-                        type_id=record["type_id"],
-                        total_volume_remain=record["total_volume_remain"],
-                        min_price=record["min_price"],
-                        price_5th_percentile=record["price_5th_percentile"],
-                        avg_of_avg_price=record["avg_of_avg_price"],
-                        avg_daily_volume=record["avg_daily_volume"],
-                        group_id=record["group_id"],
-                        type_name=record["type_name"],
-                        group_name=record["group_name"],
-                        category_id=record["category_id"],
-                        category_name=record["category_name"],
-                        days_remaining=record["days_remaining"],
-                        timestamp=record["timestamp"],
-                    )
-                    for record in batch
-                ]
-                session.add_all(stats_objects)
-                session.commit()
-                print(
-                    f"\rProcessed records {i} to {min(i + batch_size, len(records))}",
-                    end="",
-                )
-
-        except Exception as e:
-            session.rollback()
-            print(f"Error occurred: {str(e)}")
-            raise
-        finally:
-            session.close()
-            return "Stats loading completed successfully!"
-
-
 # noinspection SqlWithoutWhere
-def update_stats2(df: pd.DataFrame) -> str:
+def update_stats(df: pd.DataFrame) -> str:
     df = df.infer_objects()
     df = df.fillna(0)
 
@@ -390,7 +323,7 @@ def update_stats2(df: pd.DataFrame) -> str:
 
             conn.execute(text("DELETE FROM Market_Stats"))
             conn.commit()
-            print("Table cleared")
+        sql_logger.info("Market_Stats table cleared")
 
         df_processed.to_sql('Market_Stats', engine,
                             if_exists='replace',
@@ -446,62 +379,6 @@ def fill_missing_stats() -> str:
         print(f"Error occurred: {str(e)}")
         raise
 
-def update_short_items(df: pd.DataFrame) -> str:
-    # process the df
-    df = df.fillna("").replace([float('inf'), float('-inf')], 0)
-    df_pl = pl.from_pandas(df)
-    df_processed = insert_timestamp(df_pl)
-    df_pl.fill_null(0)
-    records = df_processed.to_dicts()
-    # start a session
-    engine = create_engine(f"sqlite:///{sql_file}", echo=False)
-    Session = sessionmaker(bind=engine)
-
-    with Session() as session:  # Corrected the session instantiation
-        try:
-
-            # Clear the table
-            session.query(ShortItems).delete()
-            session.commit()
-            print("Table cleared")
-
-            # Insert new records
-            batch_size = 1000
-            for i in range(0, len(records), batch_size):
-                batch = records[i:i + batch_size]
-                short_objects = [
-                    ShortItems(
-                        fit_id=record["fit_id"],
-                        doctrine_name=record["doctrine_name"],
-                        type_id=record["type_id"],
-                        type_name=record["type_name"],
-                        quantity=record["quantity"],
-                        volume_remain=record["volume_remain"],
-                        price=record["price"],
-                        fits_on_market=record["fits_on_market"],
-                        delta=record["delta"],
-                        doctrine_id=record["doctrine_id"],
-                        ship_type_id=record["ship_type_id"],
-                        timestamp=record["timestamp"]
-
-                    )
-
-                    for record in batch
-                ]
-                session.add_all(short_objects)
-                session.commit()
-
-                print(
-                    f"\rProcessed records {i} to {min(i + batch_size, len(records))}",
-                    end="",
-                )
-        except Exception as e:
-            session.rollback()
-            print(f"Error occurred: {str(e)}")
-            raise
-
-    return "Short items loading completed successfully!"
-
 def update_short_items_optimized(df: pd.DataFrame) -> str:
     # process the df
     df_processed = insert_pd_timestamp(df)
@@ -520,7 +397,6 @@ def update_short_items_optimized(df: pd.DataFrame) -> str:
 
     return f"{status} Short items loading completed successfully!"
 
-
 def read_short_items() -> pd.DataFrame:
     engine = create_engine(f"sqlite:///{sql_file}", echo=False)
     df = pd.read_sql_query("SELECT * FROM ShortItems", engine)
@@ -528,16 +404,6 @@ def read_short_items() -> pd.DataFrame:
     print(f'connection closed: {engine}...returning orders from ShortItems table.')
 
     return df
-
-
-def read_doctrine_items() -> pd.DataFrame:
-    engine = create_engine(f"sqlite:///{sql_file}", echo=False)
-    df = pd.read_sql_query("SELECT * FROM Doctrine_Items", engine)
-    engine.dispose()
-    print(f'connection closed: {engine}...returning orders from ShortItems table.')
-
-    return df
-
 
 def create_joined_invtypes_table():
     sql_logger.info("Creating joined_invtypes table...")
@@ -628,24 +494,6 @@ def create_joined_invtypes_table():
         mysql_session.close()
 
 
-def get_missing_icons():
-    SDEsql = '../ESI_Utilities/SDE/SDE sqlite-latest.sqlite'
-    mysql_uri = f"mysql+pymysql://{fit_sqlfile}"
-    SDE_uri = f"sqlite:///{SDEsql}"
-
-    engine = create_engine(SDE_uri, echo=False)
-    con = engine.connect()
-    df = pd.read_sql_query("""
-       SELECT j.typeID, j.iconID, i.categoryID FROM Joined_InvTypes j
-       join invGroups i on j.groupID = i.groupId
-       WHERE i.categoryID = 6
-
-       """, con)
-
-    con.close()
-    print(len(df))
-
-
 def update_doctrine_items(df: pd.DataFrame) -> str:
     # process the df
     df_pl = pl.from_pandas(df)
@@ -707,13 +555,11 @@ def optimize_for_bulk_update(engine):
         conn.execute(text("PRAGMA synchronous = OFF;"))
         conn.execute(text("PRAGMA journal_mode = MEMORY;"))
 
-
 def revert_sqlite_settings(engine):
     # Revert SQLite to safer defaults
     with engine.begin() as conn:
         conn.execute(text("PRAGMA synchronous = FULL;"))
         conn.execute(text("PRAGMA journal_mode = DELETE;"))
-
 
 def read_sql_watchlist() -> pd.DataFrame:
     engine = create_engine(mkt_sqlfile, echo=False)
@@ -724,7 +570,6 @@ def read_sql_watchlist() -> pd.DataFrame:
             "typeID": "type_id",
         })
     return df
-
 
 def read_sql_market_stats() -> pd.DataFrame:
     engine = create_engine(mkt_sqlfile, echo=False)
