@@ -1,13 +1,16 @@
+import logging
 import os
 import shutil
 
+logger = logging.getLogger('mkt_structures.file_cleanup')
 
 def rename_move_and_archive_csv(src_folder, latest_folder, archive_folder, full_cleanup):
     # Find all files matching the pattern 'valemarketstats_*.csv' in the source folder
+    logger.info('rearranging files')
     csv_files = [f for f in os.listdir(src_folder) if f.startswith("valemarketstats_") and f.endswith(".csv")]
     other_csv_files = [f for f in os.listdir(src_folder) if f.endswith(".csv")]
     if not csv_files:
-        print("No matching CSV files found.")
+        logger.warning("No matching CSV files found.")
         return
 
     # Sort the files by their modified time to get the latest one
@@ -27,7 +30,8 @@ def rename_move_and_archive_csv(src_folder, latest_folder, archive_folder, full_
 
     # Copy the latest file to the 'latest' folder with the new name
     shutil.copy(latest_file_path, latest_file_dest)
-    print(f"File '{latest_file}' has been copied and renamed to '{new_file_name}' in the '{latest_folder}' folder.")
+    logger.info(
+        f"File '{latest_file}' has been copied and renamed to '{new_file_name}' in the '{latest_folder}' folder.")
 
     # Move the rest of the files to the archive folder
     full_cleanup = full_cleanup
@@ -38,6 +42,4 @@ def rename_move_and_archive_csv(src_folder, latest_folder, archive_folder, full_
             file_path = os.path.join(src_folder, file)
             archive_file_dest = os.path.join(archive_folder, file)
             shutil.move(file_path, archive_file_dest)
-            print(f"File '{file}' has been moved to the '{archive_folder}' folder.")
-
-    print("files reshuffled but not archived")
+            logger.info(f"File '{file}' has been moved to the '{archive_folder}' folder.")

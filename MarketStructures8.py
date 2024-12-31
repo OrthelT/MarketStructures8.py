@@ -373,11 +373,17 @@ def save_data(history: DataFrame, vale_jita: DataFrame, final_data: DataFrame, f
         history[update_time] = update_time
         history.to_csv(history_filename, index=False)
 
+    logger.info("saving market stats to csv")
+    final_data['timestamp'] = update_time
     final_data.to_csv(market_stats_filename, index=False)
 
     logger.info(print('saving market stats to database'))
     status = update_stats(final_data)
-    logger.info(print(status))
+    logger.info(status)
+    logger.info(
+        print(
+            f"saving market stats to google sheet. update time: {update_time}"
+        ))
     google_sheet_updater.google_sheet_updater()
     # save a copy of market stats to update spreadsheet consistently named
     src_folder = r"output"
@@ -388,9 +394,7 @@ def save_data(history: DataFrame, vale_jita: DataFrame, final_data: DataFrame, f
 
     logger.info("saving vale_jita data")
     vale_jita.to_csv("output/latest/vale_jita.csv", index=False)
-
-
-    print(status)
+    logger.info(status)
 
 
 if __name__ == "__main__":
@@ -411,7 +415,7 @@ if __name__ == "__main__":
     doctrine_watchlist = read_doctrine_watchlist('wc_fitting')
     logger.info(f"retrieved {len(watchlist)} type_ids. watchlist is:  {type(watchlist)}")
 
-    print("MARKET ORDERS")
+    logger.info("MARKET ORDERS")
     logger.info("starting update...market orders")
     # =========================================
     market_orders = fetch_market_orders()
@@ -422,7 +426,7 @@ if __name__ == "__main__":
     logger.info(orders_status)
 
     # update history data
-    print("HISTORY CHECKS")
+    logger.info("HISTORY CHECKS")
     logger.info("updating history data")
     # =============================================
     historical_df, all_history = fetch_market_history(fresh_data_choice)
@@ -436,14 +440,12 @@ if __name__ == "__main__":
         logger.info(history_status)
 
     #process market orders
-    print('processing orders')
     logger.info("processing orders")
     vale_jita, final_data = process_orders(market_orders, historical_df)
     # check doctrine market status
 
     save_data(historical_df, vale_jita, final_data, fresh_data_choice)
 
-    print("DOCTRINE CHECKS")
     logger.info('Checking doctrines')
     # =========================================
     update_doctrine_status()
@@ -462,6 +464,6 @@ if __name__ == "__main__":
     print("ESI Request Completed Successfully.")
     print("=====================================================")
 
-    logger.info(f"Data for {len(final_data)} items retrieved.")
+    logger.info(f"Data for {len(final_data.index)} items retrieved.")
     logger.info(f"Total time: {total_time}")
     logger.info("market update complete")
