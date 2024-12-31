@@ -59,7 +59,7 @@ merged_sell_filename = (
 )
 master_history_filename = "data/masterhistory/valemarkethistory_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.csv"
 
-logger = configure_logging("mkt_structures", "logs/esi_mkt.log")
+logger = configure_logging("mkt_structures", "logs/mkt_struct.log")
 
 # ===============================================
 # Functions: Fetch Market Structure Orders
@@ -97,11 +97,14 @@ def fetch_market_orders():
         page_ratio: float = page / max_pages
         page_ratio_rounded: int = round(page_ratio * 100)
         page_ratio_rounded_str: str = str(page_ratio_rounded) + "%"
+        print("----------------------------------------------------")
         print(f"\rFetching market order pages pages {page_ratio_rounded_str}. Page: {page}", end="")
+        print("\n----------------------------------------------------")
 
         # make sure we don't hit the error limit and get our IP banned
         errorsleft = int(response.headers.get("X-ESI-Error-Limit-Remain", 0))
         errorreset = int(response.headers.get("X-ESI-Error-Limit-Reset", 0))
+
         if errorsleft == 0:
             break
         elif errorsleft < 10:
@@ -149,9 +152,11 @@ def fetch_market_orders():
 
     if failed_pages_count > 0:
         print(f"The following pages failed: {failed_pages}")
+        logger.error(f'The following pages failed: {failed_pages}')
         print(f"{failed_pages_count} pages failed.")
+        logger.error(print("{failed_pages_count} pages failed."))
     else:
-        print(f"All pages fetched successfully.")
+        print('\nAll pages fetched successfully.')
 
     with open('output/latest/all_orders.json', 'w') as f:
         json.dumps(all_orders)

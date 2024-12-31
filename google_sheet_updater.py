@@ -37,7 +37,6 @@ def google_sheet_updater() -> str:
 
     # Clean the DataFrame to ensure JSON compliance
     df = fill_na(df)
-    print(df.head())
     # access credentials to update Google sheets
     # Convert DataFrame to a list of lists (Google Sheets format)
     data_list = [df.columns.tolist()] + df.astype(str).values.tolist()
@@ -57,7 +56,7 @@ def google_sheet_updater() -> str:
 
     except Exception as e:
         message = f"An error occurred while updating MarketStats: {str(e)}"
-        print(message)
+        logger.warning(message)
         raise
     return message
 

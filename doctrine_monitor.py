@@ -11,7 +11,7 @@ fit_mysqlfile = "mysql+pymysql://Orthel:Dawson007!27608@localhost:3306/wc_fittin
 logger = logging.getLogger('mkt_structures.doctrine_monitor')
 
 def get_doctrine_fits(db_name: str = 'wc_fitting') -> pd.DataFrame:
-    logger.info('accessing_db')
+    logger.info('accessing_db and getting doctrine fits table...')
     mysql_connection = f"mysql+mysqlconnector://Orthel:Dawson007!27608@localhost:3306/{db_name}"
     engine = sqlalchemy.create_engine(mysql_connection)
     logger.info('MySql db connection established')
@@ -19,12 +19,12 @@ def get_doctrine_fits(db_name: str = 'wc_fitting') -> pd.DataFrame:
     table_name = 'watch_doctrines'
 
     query = f"SELECT id, name FROM {table_name}"
-
+    logger.info('reading doctrine fits table')
     with engine.connect() as connection:
         df = pd.read_sql_query(query, connection)
 
     doctrine_ids = ", ".join(map(str, df['id'].tolist()))
-
+    logger.info('retrieving additional data from other db tables...')
     # Use the ids in the second query
     query2 = f"""
         SELECT doctrine_id, fitting_id 
@@ -34,10 +34,13 @@ def get_doctrine_fits(db_name: str = 'wc_fitting') -> pd.DataFrame:
     doctrine_query = "SELECT id as doctrine_id, name as doctrine_name FROM watch_doctrines"
 
     with engine.connect() as connection:
+        logger.info('reading fittings_doctrine_fittings')
         fittings = pd.read_sql_query(query2, connection)
+        logger.info('reading watch_doctrines')
         doctrine_df = pd.read_sql_query(doctrine_query, engine)  # Get the doctrine names
 
     # # Merge with  existing dataframe
+    logger.info('merging additional data')
     result_df = fittings.merge(doctrine_df, on='doctrine_id', how='left')
     fit_ids = ", ".join(map(str, result_df['fitting_id'].tolist()))
 
@@ -49,6 +52,7 @@ def get_doctrine_fits(db_name: str = 'wc_fitting') -> pd.DataFrame:
     """
 
     with engine.connect() as conn:
+        logger.info('reading fittings_fitting and joining fittings_type')
         df = pd.read_sql_query(query3, engine)
     return df
 
@@ -99,6 +103,7 @@ def get_fit_items(df: pd.DataFrame, id_list: list):
     return fit_items
 
 def get_doctrine_status_optimized(target: int = 20) -> pd.DataFrame:
+
     fits_df = get_doctrine_fits(db_name='wc_fitting')
     fit_ids = fits_df['id'].tolist()
     target_items = get_fit_items(fits_df, fit_ids)
@@ -156,6 +161,7 @@ def get_doctrine_status_optimized(target: int = 20) -> pd.DataFrame:
     return df
 
 def read_doctrine_watchlist(db_name: str = 'wc_fitting') -> list:
+    logger.info('reading doctrine watchlist')
     try:
         # Create the connection string without quotes around database name
         mysql_connection = f"mysql+mysqlconnector://Orthel:Dawson007!27608@localhost:3306/{db_name}"
