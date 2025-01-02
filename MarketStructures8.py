@@ -97,9 +97,7 @@ def fetch_market_orders():
         page_ratio: float = page / max_pages
         page_ratio_rounded: int = round(page_ratio * 100)
         page_ratio_rounded_str: str = str(page_ratio_rounded) + "%"
-        print("----------------------------------------------------")
         print(f"\rFetching market order pages pages {page_ratio_rounded_str}. Page: {page}", end="")
-        print("\n----------------------------------------------------")
 
         # make sure we don't hit the error limit and get our IP banned
         errorsleft = int(response.headers.get("X-ESI-Error-Limit-Remain", 0))

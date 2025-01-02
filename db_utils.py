@@ -1,7 +1,12 @@
 import pandas as pd
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, MetaData, Table, Column, Integer, String
+from sqlalchemy.orm import sessionmaker
 
 from sql_handler import fit_sqlfile
+from sql_handler import insert_pd_timestamp
+from sql_handler import mkt_sqlfile
+from sql_handler import sql_file
+from sql_handler import sql_logger
 
 
 def get_missing_icons():
@@ -109,3 +114,31 @@ def create_joined_invtypes_table():
     finally:
         sqlite_session.close()
         mysql_session.close()
+
+
+def update_short_items_optimized(df: pd.DataFrame) -> str:
+    # process the df
+    df_processed = insert_pd_timestamp(df)
+    status = "processed data"
+
+    # start a session
+    engine = create_engine(f"sqlite:///{sql_file}", echo=False)
+
+    with engine.connect():
+        try:
+            df_processed.to_sql('market_order', con=engine, if_exists='replace', index=False, chunksize=1000)
+            status += ", data loaded"
+        except Exception as e:
+            sql_logger.error(print(f'an exception occurred in df_processed.to_sql: {e}'))
+            raise
+
+    return f"{status} Short items loading completed successfully!"
+
+
+def read_short_items() -> pd.DataFrame:
+    engine = create_engine(f"sqlite:///{sql_file}", echo=False)
+    df = pd.read_sql_query("SELECT * FROM ShortItems", engine)
+    engine.dispose()
+    print(f'connection closed: {engine}...returning orders from ShortItems table.')
+
+    return df

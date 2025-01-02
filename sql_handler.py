@@ -336,10 +336,6 @@ def fill_missing_stats() -> str:
     missing_df['avg_of_avg_price'] = missing_df['type_id'].map(hist_grouped['average'])
     missing_df['avg_daily_volume'] = missing_df['type_id'].map(hist_grouped['volume'])
 
-    # deal with remaining null values
-    missing_df = missing_df.infer_objects()
-    missing_df.fillna(0, inplace=True)
-
     # update the database
     engine = create_engine(mkt_sqlfile, echo=False)
     try:
@@ -354,37 +350,6 @@ def fill_missing_stats() -> str:
     except Exception as e:
         sql_logger.error(f"Error occurred: {str(e)}")
         raise
-
-def update_short_items_optimized(df: pd.DataFrame) -> str:
-    # process the df
-    df_processed = insert_pd_timestamp(df)
-    status = "processed data"
-
-    # start a session
-    engine = create_engine(f"sqlite:///{sql_file}", echo=False)
-
-    with engine.connect():
-        try:
-            df_processed.to_sql('market_order', con=engine, if_exists='replace', index=False, chunksize=1000)
-            status += ", data loaded"
-        except Exception as e:
-            sql_logger.error(print(f'an exception occurred in df_processed.to_sql: {e}'))
-            raise
-
-    return f"{status} Short items loading completed successfully!"
-
-def read_short_items() -> pd.DataFrame:
-    engine = create_engine(f"sqlite:///{sql_file}", echo=False)
-    df = pd.read_sql_query("SELECT * FROM ShortItems", engine)
-    engine.dispose()
-    print(f'connection closed: {engine}...returning orders from ShortItems table.')
-
-    return df
-
-
-
-
-
 
 
 def optimize_for_bulk_update(engine):
