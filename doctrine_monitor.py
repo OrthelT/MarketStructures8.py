@@ -160,11 +160,12 @@ def get_doctrine_status_optimized(target: int = 20) -> pd.DataFrame:
 
     return df
 
-def read_doctrine_watchlist(db_name: str = 'wc_fitting') -> list:
+
+def read_doctrine_watchlist() -> tuple[list, pd.DataFrame | None]:
     logger.info('reading doctrine watchlist')
     try:
         # Create the connection string without quotes around database name
-        mysql_connection = f"mysql+mysqlconnector://Orthel:Dawson007!27608@localhost:3306/{db_name}"
+        mysql_connection = fit_mysqlfile
         # Create engine with echo=True to see SQL output for debugging
         engine = sqlalchemy.create_engine(mysql_connection, echo=True)
         # Test the connection before executing query
@@ -179,22 +180,38 @@ def read_doctrine_watchlist(db_name: str = 'wc_fitting') -> list:
             """
             # Execute query and convert to DataFrame
             df = pd.read_sql_query(query, connection)
-            # Convert to list and return
-            id_list = df['type_id'].tolist()
-            return id_list
+
+        # merge in type info for compatability with Mkt Sql file
+        engine = create_engine(mkt_sqlfile)
+        with engine.connect() as conn:
+            type_info = pd.read_sql_table('JoinedInvTypes', conn)
+            old_cols = ['typeID', 'groupID', 'typeName', 'groupName', 'categoryID',
+                        'categoryName']
+            drop_cols = ['categoryID_2', 'metaGroupID', 'metaGroupID_2',
+                         'metaGroupName']
+            new_cols = ['type_id', 'group_id', 'type_name', 'group_name', 'category_id',
+                        'category_name']
+
+        type_info.drop(columns=drop_cols, inplace=True)
+        type_info.rename(columns=dict(zip(old_cols, new_cols)), inplace=True)
+
+        df2 = pd.merge(df, type_info, on='type_id', how='left')
+
+        df2.reset_index(drop=True, inplace=True)
+        df3 = df2.infer_objects()
+        # Convert to list and return
+        id_list = df['type_id'].tolist()
+
+        return id_list, df3
 
     except exc.OperationalError as e:
-        logger.warning(f"Database connection error: {str(e)}")
-        return []
+        logger.error(f"Database connection error: {str(e)}")
     except exc.ProgrammingError as e:
-        logger.warning(f"SQL query error: {str(e)}")
-        return []
+        logger.error(f"SQL query error: {str(e)}")
     except Exception as e:
-        logger.warning(f"Unexpected error: {str(e)}")
-        return []
-    finally:
-        if 'engine' in locals():
-            engine.dispose()
+        logger.error(f"Unexpected error: {str(e)}")
+
+
 
 def clean_doctrine_columns(df: pd.DataFrame) -> pd.DataFrame:
     # df = df.drop(columns=["doctrine_id", "ship_type_id"])

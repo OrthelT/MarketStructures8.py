@@ -266,7 +266,7 @@ def fetch_market_history(fresh_data: bool == True) -> tuple[DataFrame, list[Any]
 # Functions: Process Market Stats
 # -----------------------------------------------
 def aggregate_sell_orders(market_orders_json: any) -> pd.DataFrame:
-    logger.info("aggregating sell orders")
+    logger.info("aggregating sell orders | aggregate_sell_orders()")
     orders = pd.DataFrame(market_orders_json)
 
     ids = read_sql_watchlist()
@@ -275,9 +275,9 @@ def aggregate_sell_orders(market_orders_json: any) -> pd.DataFrame:
     filtered_orders = orders[orders["type_id"].isin(ids)]
     sell_orders = filtered_orders[filtered_orders["is_buy_order"] == False]
 
-    logger.info(f'filtered orders: {len(filtered_orders)}')
-    logger.info(f'sell orders: {len(sell_orders)}')
-    logger.info("aggregating orders")
+    logger.info(f'filtered orders: {len(filtered_orders)} | aggregate_sell_orders()')
+    logger.info(f'sell orders: {len(sell_orders)} | aggregate_sell_orders()')
+    logger.info("aggregating orders | aggregate_sell_orders")
 
     grouped_df = sell_orders.groupby("type_id")["volume_remain"].sum().reset_index()
     grouped_df.columns = ["type_id", "total_volume_remain"]
@@ -289,12 +289,12 @@ def aggregate_sell_orders(market_orders_json: any) -> pd.DataFrame:
     percentile_5th_df.columns = ["type_id", "price_5th_percentile"]
     merged_df = pd.merge(grouped_df, min_price_df, on="type_id")
     merged_df = pd.merge(merged_df, percentile_5th_df, on="type_id")
-    logger.info("successfully merged dataframes and completed aggregation")
-    logger.info(f"returning merged dataframe with {len(merged_df)} rows")
+    logger.info("successfully merged dataframes and completed aggregation | aggregate_sell_orders()")
+    logger.info(f"returning merged dataframe with {len(merged_df)} rows | aggregate_sell_orders()")
     return merged_df
 
 def merge_market_stats(merged_orders: pd.DataFrame, history_data: pd.DataFrame):
-    logger.info("merging historical data")
+    logger.info("merging historical data | merge_market_stats()")
     grouped_historical_df = history_merge(history_data)
     grouped_historical_df['type_id'] = grouped_historical_df['type_id'].astype('int64')
 
@@ -302,10 +302,10 @@ def merge_market_stats(merged_orders: pd.DataFrame, history_data: pd.DataFrame):
         merged_orders, grouped_historical_df, on="type_id", how="left"
     )
 
-    logger.info('filtering orders to watchlist')
+    logger.info('filtering orders to watchlist | merge_market_stats()')
     final_df = pd.merge(merged_data, watchlist, on="type_id", how="left")
 
-    logger.info('calculating days remaining')
+    logger.info('calculating days remaining | merge_market_stats()')
     final_df["days_remaining"] = final_df.apply(
         lambda row: 0 if row["avg_daily_volume"] == 0 else row["total_volume_remain"] / row["avg_daily_volume"],
         axis=1
@@ -342,21 +342,22 @@ def history_merge(history_data: pd.DataFrame) -> pd.DataFrame:
     return grouped_historical_df
 
 def update_doctrine_status(target: int = 20):
+    logger.info("checking doctrines | update_doctrine_status()")
     target_df = get_doctrine_status_optimized(target=target)
     status = google_sheet_updater.google_sheet_updater_doctrine_items(target_df)
-    logger.info(status)
+    logger.info(f'update_doctrine_status() {status}')
     target_df.to_csv("output/latest/target_doctrines.csv", index=False)
-    logger.info(print("Completed doctrines check"))
+    logger.info(print("Completed doctrines check | update_doctrine_status()"))
 
 def process_orders(market_orders, history_data) -> tuple[DataFrame, DataFrame]:
-    logger.info("aggregating sell orders")
+    logger.info("aggregating sell orders | process_orders()")
     merged_sell_orders = aggregate_sell_orders(market_orders)
 
-    logger.info("merging historical data")
+    logger.info("merging historical data | process_orders()")
     final_data = merge_market_stats(merged_sell_orders, history_data)
 
     logger.info(type(final_data))
-    logger.info("getting jita prices")
+    logger.info("getting jita prices | process_orders()")
     vale_jita = get_jita_prices(final_data)
     return vale_jita, final_data
 
@@ -387,7 +388,7 @@ def save_data(history: DataFrame, vale_jita: DataFrame, final_data: DataFrame, f
         print(
             f"saving market stats to google sheet. update time: {update_time}"
         ))
-    google_sheet_updater.google_sheet_updater()
+    google_sheet_updater.google_mkt_sheet_updater()
     # save a copy of market stats to update spreadsheet consistently named
     src_folder = r"output"
     latest_folder = os.path.join(src_folder, "latest")
@@ -415,7 +416,7 @@ if __name__ == "__main__":
     # retrieve current watchlist from database
     logger.info(f"reading watchlist from database")
     watchlist = read_sql_watchlist()
-    doctrine_watchlist = read_doctrine_watchlist('wc_fitting')
+    doctrine_watchlist, _ = read_doctrine_watchlist()
     logger.info(f"retrieved {len(watchlist)} type_ids. watchlist is:  {type(watchlist)}")
 
     logger.info("MARKET ORDERS")

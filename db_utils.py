@@ -1,3 +1,5 @@
+from dis import name
+
 import pandas as pd
 from sqlalchemy import create_engine, MetaData, Table, Column, Integer, String
 from sqlalchemy.orm import sessionmaker
@@ -142,3 +144,7 @@ def read_short_items() -> pd.DataFrame:
     print(f'connection closed: {engine}...returning orders from ShortItems table.')
 
     return df
+
+
+if name == '__main__':
+    pass

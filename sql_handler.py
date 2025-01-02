@@ -7,6 +7,7 @@ import polars as pl
 from sqlalchemy import (create_engine, text)
 from sqlalchemy.orm import declarative_base
 
+from doctrine_monitor import read_doctrine_watchlist
 from models import (MarketStats)
 
 sql_logger = logging.getLogger('mkt_structures.sql_handler')
@@ -366,6 +367,7 @@ def revert_sqlite_settings(engine):
         conn.execute(text("PRAGMA journal_mode = DELETE;"))
 
 def read_sql_watchlist() -> pd.DataFrame:
+    # grabs the current watchlist and returns it as a dataframe
     engine = create_engine(mkt_sqlfile, echo=False)
     with engine.connect() as conn:
         df = pd.read_sql_table('watchlist_mkt', conn)
@@ -373,6 +375,17 @@ def read_sql_watchlist() -> pd.DataFrame:
         columns={
             "typeID": "type_id",
         })
+    # check to make sure there are not any doctrine items not included in the
+    # current watchlist
+    _, doc = read_doctrine_watchlist()
+    missing = doc[~doc['type_id'].isin(df['type_id'])]
+    if missing.empty:
+        sql_logger.info("no missing items found, returning watchlist")
+    else:
+        sql_logger.info("missing items found, merging doctrine_ids into watchlist")
+        df = df.merge(missing, on='type_id', how='left')
+        df.reset_index(inplace=True, drop=True)
+
     return df
 
 def read_sql_market_stats() -> pd.DataFrame:
@@ -403,4 +416,5 @@ def update_market_basket(df: pd.DataFrame) -> str:
     return "Market basket loading completed successfully!"
 
 if __name__ == "__main__":
+
     pass

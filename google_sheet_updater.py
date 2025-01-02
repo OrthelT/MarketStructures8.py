@@ -4,7 +4,7 @@ import gspread
 import pandas as pd
 from google.oauth2.service_account import Credentials
 
-from sql_handler import read_sql_market_stats
+from sql_handler import read_sql_market_stats, read_sql_watchlist
 
 logger = logging.getLogger('mkt_structures.google_sheet_updater')
 
@@ -22,7 +22,8 @@ def get_credentials(SCOPES: list):
     gc = gspread.authorize(credentials)
     return gc
 
-def google_sheet_updater() -> str:
+
+def google_mkt_sheet_updater() -> str:
     gc = get_credentials(SCOPES)
 
     df = read_sql_market_stats()
@@ -36,6 +37,7 @@ def google_sheet_updater() -> str:
     df = df.rename(columns=col_map)
 
     # Clean the DataFrame to ensure JSON compliance
+    df = df.infer_objects()
     df = fill_na(df)
     # access credentials to update Google sheets
     # Convert DataFrame to a list of lists (Google Sheets format)
@@ -97,28 +99,34 @@ def fill_na(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 def gsheet_image_updater(df: pd.DataFrame):
-    #utility function to post a table of URLs to use in dashboard views
+    # utility function to post a table of URLs to use for icons in dashboard views
     gc = get_credentials(SCOPES)
-    df = df.copy()  # Work on a copy to avoid modifying the original DataFrame
-    # Convert DataFrame to a list of lists (Google Sheets format)
+
+    watchlist = read_sql_watchlist()
+    type_ids = watchlist['type_id'].tolist()
+    df = pd.DataFrame()
+
+    for type_id in type_ids:
+        url = f"https://images.evetech.net/types/{type_id}/render?size=64"
+        df = pd.concat([df, pd.DataFrame({"type_id": [type_id], "URLs": [url]})], ignore_index=True)
+        # Convert DataFrame to a list of lists (Google Sheets format)
     data_list = [df.columns.tolist()] + df.astype(str).values.tolist()
     wb = gc.open("4H Market Status")
     sheet = wb.worksheet("URLs")
     try:
         # Clear the existing content in the sheet
         sheet.clear()
-
         # Update the sheet with new data, starting at cell A1
         result = sheet.update('A1', data_list)
-        print(result)
-        message = "image data updated successfully!"
+        logger.info(result)
+
     except Exception as e:
         # Handle errors gracefully
-        message = f"An error occurred while updating short items: {str(e)}"
-        print(message)
+        result = f"An error occurred while updating short items: {str(e)}"
+        logger.error(result)
         raise
 
-    return message
+    return result
 
 
 if __name__ == "__main__":
