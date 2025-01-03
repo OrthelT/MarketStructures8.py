@@ -328,7 +328,6 @@ def fill_missing_stats() -> str:
                  'avg_of_avg_price', 'avg_daily_volume', 'group_id', 'type_name',
                  'group_name', 'category_id', 'category_name', 'days_remaining', 'timestamp'])
     missing_df = pd.concat([missing, missing_df])
-    missing_df['timestamp'] = stats['timestamp']
     missing_df['total_volume_remain'] = stats['total_volume_remain']
 
     # fill historical values where available
@@ -336,6 +335,15 @@ def fill_missing_stats() -> str:
     hist_grouped = hist.groupby("type_id").agg({'average': 'mean', 'volume': 'mean'})
     missing_df['avg_of_avg_price'] = missing_df['type_id'].map(hist_grouped['average'])
     missing_df['avg_daily_volume'] = missing_df['type_id'].map(hist_grouped['volume'])
+
+    # all null values must die
+    missing_df = missing_df.infer_objects()
+    missing_df = missing_df.fillna(0)
+
+    # put timestamps back in because SQL Alchemy will very cross with us
+    # if we put zeros in the timestamp column while nuking the null values
+    # datetime values can never be 0
+    missing_df['timestamp'] = stats['timestamp']
 
     # update the database
     engine = create_engine(mkt_sqlfile, echo=False)
@@ -416,5 +424,4 @@ def update_market_basket(df: pd.DataFrame) -> str:
     return "Market basket loading completed successfully!"
 
 if __name__ == "__main__":
-
-    pass
+    fill_missing_stats()
