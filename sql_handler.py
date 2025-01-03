@@ -158,24 +158,6 @@ def process_pd_dataframe(
     return df
 
 
-def insert_type_names(df: pl.DataFrame) -> pl.DataFrame:
-    engine = create_engine(mkt_sqlfile, echo=False)
-
-    match_type_ids = """
-       SELECT typeID, typeName FROM JoinedInvTypes
-       """
-    with engine.connect() as conn:
-        result = conn.execute(text(match_type_ids))
-        type_mappings = result.fetchall()
-
-    type_dict = dict(type_mappings)
-
-    df_named = df.with_columns(
-        pl.col("type_id")
-        .map_elements(lambda x: type_dict.get(x), return_dtype=pl.String)
-        .alias("type_name")
-    )
-    return df_named
 
 def insert_pd_type_names(df: pd.DataFrame) -> pd.DataFrame:
     engine = create_engine(mkt_sqlfile, echo=False)
@@ -194,31 +176,6 @@ def insert_pd_type_names(df: pd.DataFrame) -> pd.DataFrame:
     df2 = df2.merge(names, on='type_id', how='left')
 
     return df2
-
-
-def insert_timestamp(df: pl.DataFrame) -> pl.DataFrame:
-    ts = datetime.now(timezone.utc)
-    df = df.with_columns(
-        pl.lit(ts).alias("timestamp"),
-    )
-    return df
-
-
-def insert_pd_timestamp(df: pd.DataFrame) -> pd.DataFrame:
-    df2 = df.copy()
-    ts = datetime.now(timezone.utc)
-
-    # detect if timestamp already exists
-    if 'timestamp' in df2.columns:
-        if pd.api.types.is_datetime64_any_dtype(df2['timestamp']):
-            sql_logger.info('timestamp exists')
-            return df2
-        else:
-            df2.drop(columns=['timestamp'], inplace=True)
-
-    df2.loc[:, "timestamp"] = ts
-    return df2
-
 
 def process_esi_market_order_optimized(data: List[dict], is_history: bool = False) -> str:
     # Create a DataFrame from the list of dictionaries

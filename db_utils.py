@@ -146,5 +146,12 @@ def read_short_items() -> pd.DataFrame:
     return df
 
 
+def insert_timestamp(df: pl.DataFrame) -> pl.DataFrame:
+    ts = datetime.now(timezone.utc)
+    df = df.with_columns(
+        pl.lit(ts).alias("timestamp"),
+    )
+    return df
+
 if name == '__main__':
     pass

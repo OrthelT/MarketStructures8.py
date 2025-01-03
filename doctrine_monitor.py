@@ -160,7 +160,6 @@ def get_doctrine_status_optimized(target: int = 20) -> pd.DataFrame:
 
     return df
 
-
 def read_doctrine_watchlist() -> tuple[list, pd.DataFrame | None]:
     logger.info('reading doctrine watchlist')
     try:
@@ -210,7 +209,6 @@ def read_doctrine_watchlist() -> tuple[list, pd.DataFrame | None]:
         logger.error(f"SQL query error: {str(e)}")
     except Exception as e:
         logger.error(f"Unexpected error: {str(e)}")
-
 
 
 def clean_doctrine_columns(df: pd.DataFrame) -> pd.DataFrame:
