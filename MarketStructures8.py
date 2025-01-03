@@ -345,6 +345,7 @@ def update_doctrine_status(target: int = 20):
     logger.info("checking doctrines | update_doctrine_status()")
     target_df = get_doctrine_status_optimized(target=target)
     status = google_sheet_updater.google_sheet_updater_doctrine_items(target_df)
+    print(target_df.dtypes)
     logger.info(f'update_doctrine_status() {status}')
     target_df.to_csv("output/latest/target_doctrines.csv", index=False)
     logger.info(print("Completed doctrines check | update_doctrine_status()"))

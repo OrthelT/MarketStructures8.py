@@ -3,12 +3,11 @@ from datetime import datetime, timezone
 from typing import List
 
 import pandas as pd
-import polars as pl
 from sqlalchemy import (create_engine, text)
 from sqlalchemy.orm import declarative_base
 
 from doctrine_monitor import read_doctrine_watchlist
-from models import (MarketStats)
+from models import MarketStats
 
 sql_logger = logging.getLogger('mkt_structures.sql_handler')
 
@@ -53,8 +52,85 @@ stats_columns = [
 ]
 
 
+def insert_pd_timestamp(df: pd.DataFrame) -> pd.DataFrame:
+    df2 = df.copy()
+    ts = datetime.now(timezone.utc)
+
+    # detect if timestamp already exists
+    if 'timestamp' in df2.columns:
+        if pd.api.types.is_datetime64_any_dtype(df2['timestamp']):
+            sql_logger.info('timestamp exists')
+            return df2
+        else:
+            df2.drop(columns=['timestamp'], inplace=True)
+
+    df2.loc[:, "timestamp"] = ts
+    return df2
 
 
+def insert_pd_type_names(df: pd.DataFrame) -> pd.DataFrame:
+    engine = create_engine(mkt_sqlfile, echo=False)
+
+    match_type_ids = """
+       SELECT typeID, typeName FROM JoinedInvTypes
+       """
+
+    with engine.connect() as conn:
+        result = conn.execute(text(match_type_ids))
+        type_mappings = result.fetchall()
+
+    names = pd.DataFrame(type_mappings, columns=['type_id', 'type_name'])
+
+    df2 = df.copy()
+    df2 = df2.merge(names, on='type_id', how='left')
+
+    return df2
+
+
+def fill_missing_stats() -> str:
+    stats = read_sql_market_stats()
+    watchlist = read_sql_watchlist()
+
+    stats['type_id'] = stats['type_id'].astype(int)
+
+    missing = watchlist[~watchlist['type_id'].isin(stats['type_id'])]
+
+    missing_df = pd.DataFrame(
+        columns=['type_id', 'total_volume_remain', 'min_price', 'price_5th_percentile',
+                 'avg_of_avg_price', 'avg_daily_volume', 'group_id', 'type_name',
+                 'group_name', 'category_id', 'category_name', 'days_remaining', 'timestamp'])
+    missing_df = pd.concat([missing, missing_df])
+    missing_df['total_volume_remain'] = stats['total_volume_remain']
+
+    # fill historical values where available
+    hist = read_history(30)
+    hist_grouped = hist.groupby("type_id").agg({'average': 'mean', 'volume': 'mean'})
+    missing_df['avg_of_avg_price'] = missing_df['type_id'].map(hist_grouped['average'])
+    missing_df['avg_daily_volume'] = missing_df['type_id'].map(hist_grouped['volume'])
+
+    # all null values must die
+    missing_df = missing_df.infer_objects()
+    missing_df = missing_df.fillna(0)
+
+    # put timestamps back in because SQL Alchemy will very cross with us
+    # if we put zeros in the timestamp column while nuking the null values
+    # datetime values can never be 0
+    missing_df['timestamp'] = stats['timestamp']
+
+    # update the database
+    engine = create_engine(mkt_sqlfile, echo=False)
+    try:
+        with engine.connect() as conn:
+            missing_df.to_sql('Market_Stats', engine,
+                              if_exists='append',
+                              index=False,
+                              method='multi',
+                              chunksize=1000
+                              )
+        return "missing Stats loading completed successfully!"
+    except Exception as e:
+        sql_logger.error(f"Error occurred: {str(e)}")
+        raise
 
 def process_pd_dataframe(
         df: pd.DataFrame, columns: list, date_column: str = None
@@ -170,6 +246,23 @@ def process_esi_market_order_optimized(data: List[dict], is_history: bool = Fals
     return status
 
 
+def read_history(doys: int = 30) -> pd.DataFrame:
+    engine = create_engine(mkt_sqlfile, echo=False)
+
+    # Create a session factoryf
+    session = engine.connect()
+    sql_logger.info(f'connection established: {session} by sql_handler.read_history()')
+    d = f"'-{doys} days'"
+
+    stmt = f"""
+    SELECT * FROM market_history
+    WHERE date >= date('now', {d})"""
+
+    historydf = pd.read_sql(stmt, session)
+    session.close()
+    sql_logger.info(f'connection closed: {session}...returning orders from market_history table.')
+    return historydf
+
 def update_history(df: pd.DataFrame) -> str:
     engine = create_engine(mkt_sqlfile, echo=False)
 
@@ -198,7 +291,6 @@ def update_history(df: pd.DataFrame) -> str:
     revert_sqlite_settings(engine)
 
     return status
-
 
 def update_orders(df: pd.DataFrame) -> str:
     sql_logger.info("updating orders...initiating engine")
@@ -231,61 +323,6 @@ def update_orders(df: pd.DataFrame) -> str:
 
     return status
 
-
-def read_history(doys: int = 30) -> pd.DataFrame:
-    engine = create_engine(mkt_sqlfile, echo=False)
-
-    # Create a session factoryf
-    session = engine.connect()
-    sql_logger.info(f'connection established: {session} by sql_handler.read_history()')
-    d = f"'-{doys} days'"
-
-    stmt = f"""
-    SELECT * FROM market_history
-    WHERE date >= date('now', {d})"""
-
-    historydf = pd.read_sql(stmt, session)
-    session.close()
-    sql_logger.info(f'connection closed: {session}...returning orders from market_history table.')
-    return historydf
-
-
-def update_current_orders(df: pl.DataFrame) -> str:
-    df_processed = insert_type_names(df)
-    records = df_processed.to_dicts()
-
-    engine = create_engine(f"sqlite:///{sql_file}", echo=False)
-    with engine.connect() as conn:
-        batch_size = 1000
-        status = "failed"
-        current_statement = """
-            INSERT INTO current_orders
-                (order_id, type_id, type_name, volume_remain, price, issued, duration, is_buy_order, timestamp)
-                VALUES
-                (:order_id, :type_id, :type_name, :volume_remain, :price, :issued, :duration, :is_buy_order, :timestamp);
-            """
-
-        clear_table = "DELETE FROM current_orders;"
-
-        try:
-            conn.execute(text(clear_table))
-            conn.commit()
-        except Exception as e:
-            sql_logger.error(f"Error clearing table: {str(e)}")
-            raise
-
-        try:
-            for i in range(0, len(records), batch_size):
-                batch = records[i: i + batch_size]
-                conn.execute(text(current_statement), batch)
-                conn.commit()
-                sql_logger.info(f"Processed records {i} to {min(i + batch_size, len(records))}")
-        except Exception as e:
-            sql_logger.error(print("Error inserting data: {str(e)}"))
-            raise
-
-    return status
-
 def update_stats(df: pd.DataFrame) -> str:
     df = df.infer_objects()
     df = df.fillna(0)
@@ -315,50 +352,6 @@ def update_stats(df: pd.DataFrame) -> str:
         sql_logger.error(f"Error occurred: {str(e)}")
         raise
 
-def fill_missing_stats() -> str:
-    stats = read_sql_market_stats()
-    watchlist = read_sql_watchlist()
-
-    stats['type_id'] = stats['type_id'].astype(int)
-
-    missing = watchlist[~watchlist['type_id'].isin(stats['type_id'])]
-
-    missing_df = pd.DataFrame(
-        columns=['type_id', 'total_volume_remain', 'min_price', 'price_5th_percentile',
-                 'avg_of_avg_price', 'avg_daily_volume', 'group_id', 'type_name',
-                 'group_name', 'category_id', 'category_name', 'days_remaining', 'timestamp'])
-    missing_df = pd.concat([missing, missing_df])
-    missing_df['total_volume_remain'] = stats['total_volume_remain']
-
-    # fill historical values where available
-    hist = read_history(30)
-    hist_grouped = hist.groupby("type_id").agg({'average': 'mean', 'volume': 'mean'})
-    missing_df['avg_of_avg_price'] = missing_df['type_id'].map(hist_grouped['average'])
-    missing_df['avg_daily_volume'] = missing_df['type_id'].map(hist_grouped['volume'])
-
-    # all null values must die
-    missing_df = missing_df.infer_objects()
-    missing_df = missing_df.fillna(0)
-
-    # put timestamps back in because SQL Alchemy will very cross with us
-    # if we put zeros in the timestamp column while nuking the null values
-    # datetime values can never be 0
-    missing_df['timestamp'] = stats['timestamp']
-
-    # update the database
-    engine = create_engine(mkt_sqlfile, echo=False)
-    try:
-        with engine.connect() as conn:
-            missing_df.to_sql('Market_Stats', engine,
-                              if_exists='append',
-                              index=False,
-                              method='multi',
-                              chunksize=1000
-                              )
-        return "missing Stats loading completed successfully!"
-    except Exception as e:
-        sql_logger.error(f"Error occurred: {str(e)}")
-        raise
 
 
 def optimize_for_bulk_update(engine):
@@ -424,4 +417,4 @@ def update_market_basket(df: pd.DataFrame) -> str:
     return "Market basket loading completed successfully!"
 
 if __name__ == "__main__":
-    fill_missing_stats()
+    pass
