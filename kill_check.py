@@ -4,8 +4,10 @@ from logging import getLogger
 
 import pandas as pd
 import requests
+from dateutil.relativedelta import relativedelta
+from sqlalchemy import create_engine
 
-from sql_handler import insert_pd_type_names
+from sql_handler import insert_pd_type_names, get_doctrine_status_optimized
 
 logger = getLogger('mkt_structures.kill_check')
 
@@ -43,6 +45,8 @@ def frt_km_query():
 
     logger.info('sending request')
     response = requests.post(url, headers=headers, json=payload)
+    status = response.headers
+    print(status)
 
     # Check the response
     if response.status_code == 200:
@@ -64,7 +68,7 @@ def frt_km_query():
 
 def get_ship_loss_stats():
     # DO NOT FORGET TO REMOVE THIS GARBAGE
-    test_mode = True
+    test_mode = False
     if test_mode:
         with open('data/2025-01-03_00-27-14.json') as f:
             data = json.load(f)
@@ -93,11 +97,33 @@ def get_ship_loss_stats():
 
     ts = datetime.now(tz=timezone.utc)
     df_named['timestamp'] = ts
+    df_named['timestamp'] = pd.to_datetime(df_named['timestamp'])
+
+    df = get_doctrine_status_optimized(
+    )
+
+    print(df.head())
+    engine = create_engine(f'{testdb}')
+    with engine.connect() as conn:
+        df.to_sql('Doctrines', conn, if_exists='replace', index=False)
+
+    return df_named
 
 
 if __name__ == '__main__':
-    pass
+    with open('data/2025-01-03_00-27-14.json') as f:
+        data = json.load(f)
+    dates = []
+    real_dates = []
+    for item in data:
+        dates.append(item['kill_time'])
+        real_dates.append(datetime.fromtimestamp(item['kill_time']))
 
+    dy = datetime.today()
+
+    yd = dy + relativedelta(days=-7)
+
+    print(yd)
     # "killmail_id": 123668120,
     # "kill_time": 1735753973,
     # "victim": {

@@ -211,18 +211,7 @@ def read_doctrine_watchlist() -> tuple[list, pd.DataFrame | None]:
         logger.error(f"Unexpected error: {str(e)}")
 
 
-def clean_doctrine_columns(df: pd.DataFrame) -> pd.DataFrame:
-    # df = df.drop(columns=["doctrine_id", "ship_type_id"])
-    doctrines = get_doctrine_fits()
-    doctrines = doctrines.rename(columns={'name': 'doctrine_name', 'id': 'fit_id'})
-    doctrines.drop('type_name', inplace=True, axis=1)
 
-    merged_df = df.merge(doctrines, on='doctrine_name', how='left')
-
-    new_cols = ['type_id', 'type_name', 'quantity', 'volume_remain', 'price', 'fits_on_market',
-                'delta', 'fit_id', 'doctrine_name', 'doctrine_id', 'ship_type_id']
-    updated_merged_df = merged_df[new_cols]
-    return updated_merged_df
 
 if __name__ == "__main__":
     pass
