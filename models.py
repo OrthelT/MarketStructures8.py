@@ -7,11 +7,18 @@ from sqlalchemy import (
     Float,
     DateTime,
     Boolean,
-    PrimaryKeyConstraint,
-)
-from sqlalchemy.orm import declarative_base, mapped_column, Mapped
+    PrimaryKeyConstraint, )
+from sqlalchemy.orm import declarative_base, mapped_column, Mapped, DeclarativeBase
+
+mkt_sqlfile = "sqlite:///market_orders.sqlite"
+testdb = 'sqlite:///test.sqlite'
+fit_mysqlfile = "mysql+pymysql://Orthel:Dawson007!27608@localhost:3306/wc_fitting"
 
 Base = declarative_base()
+
+
+class Base(DeclarativeBase):
+    pass
 
 class MarketOrder(Base):
     __tablename__ = "market_order"
@@ -56,93 +63,6 @@ class MarketStats(Base):
     days_remaining: Mapped[int] = mapped_column(Integer, nullable=True)
     timestamp: Mapped[datetime] = mapped_column(DateTime)
 
-class Doctrine_Fits(Base):
-    __tablename__ = "Doctrine_Fittings"
-    doctrine_id: Mapped[int] = mapped_column(Integer)
-    doctrine_name: Mapped[str] = mapped_column(String(100))
-    doctrine_version: Mapped[str] = mapped_column(String(100))
-    fitting_name: Mapped[str] = mapped_column(String(100), primary_key=True)
-    ship_class: Mapped[str] = mapped_column(String(50))
-    ship_group: Mapped[str] = mapped_column(String(50))
-    ship_group_id: Mapped[str] = mapped_column(String(100))
-
-
-class Fitting_Items(Base):
-    __tablename__ = "Fittings"
-    type_id: Mapped[str] = mapped_column(String(10), primary_key=True)
-    fitting_name: Mapped[str] = mapped_column(String(100))
-    type_name: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
-    qty_required: Mapped[int] = mapped_column(Integer)
-    fitting_version: Mapped[int] = mapped_column(Integer)
-    is_hull: Mapped[bool] = mapped_column(Boolean)
-
-
-class CurrentOrders(Base):
-    __tablename__ = "current_orders"
-    order_id: Mapped[int] = mapped_column(primary_key=True)
-    type_id: Mapped[str] = mapped_column(String(10))
-    type_name: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
-    volume_remain: Mapped[int] = mapped_column(Integer)
-    price: Mapped[float] = mapped_column(Float)
-    issued: Mapped[datetime] = mapped_column(DateTime)
-    duration: Mapped[int] = mapped_column(Integer)
-    is_buy_order: Mapped[bool] = mapped_column(Boolean)
-    timestamp: Mapped[datetime] = mapped_column(DateTime)
-
-class ShortItems(Base):
-    __tablename__ = "ShortItems"
-    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    fit_id: Mapped[int] = mapped_column(Integer)
-    doctrine_name: Mapped[str] = mapped_column(String(100), nullable=True)
-    type_id: Mapped[int] = mapped_column(Integer)
-    type_name: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
-    quantity: Mapped[int] = mapped_column(Integer, nullable=True)
-    volume_remain: Mapped[float] = mapped_column(Float, nullable=True)
-    price: Mapped[float] = mapped_column(Float, nullable=True)
-    fits_on_market: Mapped[int] = mapped_column(Integer, nullable=True)
-    delta: Mapped[float] = mapped_column(Float, nullable=True)
-    doctrine_id: Mapped[int] = mapped_column(Integer, nullable=True)
-    ship_type_id: Mapped[int] = mapped_column(Integer, nullable=True)
-    timestamp: Mapped[datetime] = mapped_column(DateTime, nullable=True)
-
-class Doctrine_Items(Base):
-    __tablename__ = "Doctrine_Items"
-    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    fit_id: Mapped[int] = mapped_column(Integer)
-    doctrine_name: Mapped[str] = mapped_column(String(100), nullable=True)
-    type_id: Mapped[int] = mapped_column(Integer)
-    type_name: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
-    quantity: Mapped[int] = mapped_column(Integer, nullable=True)
-    volume_remain: Mapped[float] = mapped_column(Float, nullable=True)
-    price: Mapped[float] = mapped_column(Float, nullable=True)
-    fits_on_market: Mapped[int] = mapped_column(Integer, nullable=True)
-    delta: Mapped[float] = mapped_column(Float, nullable=True)
-    doctrine_id: Mapped[int] = mapped_column(Integer, nullable=True)
-    ship_type_id: Mapped[int] = mapped_column(Integer, nullable=True)
-    timestamp: Mapped[datetime] = mapped_column(DateTime, nullable=True)
-
-class MarketBasket(Base):
-    __tablename__ = "MarketBasket"
-
-    type_id: Mapped[int] = mapped_column(Integer)
-    date: Mapped[datetime] = mapped_column(DateTime)
-    buy_price_low: Mapped[float] = mapped_column(Float)
-    buy_price_avg: Mapped[float] = mapped_column(Float)
-    buy_price_high: Mapped[float] = mapped_column(Float)
-    sell_price_low: Mapped[float] = mapped_column(Float)
-    sell_price_avg: Mapped[float] = mapped_column(Float)
-    sell_price_high: Mapped[float] = mapped_column(Float)
-    buy_volume_low: Mapped[int] = mapped_column(Integer)
-    buy_volume_avg: Mapped[int] = mapped_column(Integer)
-    buy_volume_high: Mapped[int] = mapped_column(Integer)
-    sell_volume_low: Mapped[int] = mapped_column(Integer)
-    sell_volume_avg: Mapped[int] = mapped_column(Integer)
-    sell_volume_high: Mapped[int] = mapped_column(Integer)
-    ore: Mapped[str] = mapped_column(String(100))
-    qty: Mapped[int] = mapped_column(Integer)
-
-    __table_args__ = (PrimaryKeyConstraint("date", "type_id"),)
-
 
 class ShipsDestroyed(Base):
     __tablename__ = "ShipsDestroyed"
@@ -164,5 +84,31 @@ class DoctrineTargets(Base):
     ship_losses: Mapped[int] = mapped_column(Integer)
     adj_target: Mapped[int] = mapped_column(Integer)
 
-    if __name__ == '__main__':
-        pass
+
+class Doctrines(Base):
+    __tablename__ = "Doctrines"
+    fit_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    type_id: Mapped[int] = mapped_column(Integer)
+    category: Mapped[str] = mapped_column(String(10))
+    fit: Mapped[str] = mapped_column(String(100))
+    ship: Mapped[str] = mapped_column(String(100))
+    item: Mapped[str] = mapped_column(String(100))
+    qty: Mapped[int] = mapped_column(Integer)
+    stock: Mapped[int] = mapped_column(Integer)
+    fits: Mapped[float] = mapped_column(Float)
+    days: Mapped[float] = mapped_column(Float)
+    price_4h: Mapped[float] = mapped_column(Float)
+    avg_vol: Mapped[float] = mapped_column(Float)
+    avg_price: Mapped[float] = mapped_column(Float)
+    delta: Mapped[float] = mapped_column(Float)
+    doctrine: Mapped[str] = mapped_column(String(100))
+    group: Mapped[str] = mapped_column(String(100))
+    cat_id: Mapped[int] = mapped_column(Integer)
+    grp_id: Mapped[int] = mapped_column(Integer)
+    doc_id: Mapped[int] = mapped_column(Integer)
+    ship_id: Mapped[int] = mapped_column(Integer)
+    timestamp: Mapped[datetime] = mapped_column(DateTime)
+
+
+if __name__ == '__main__':
+    pass

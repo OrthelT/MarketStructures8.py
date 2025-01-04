@@ -6,7 +6,7 @@ import pandas as pd
 from sqlalchemy import (create_engine, text)
 from sqlalchemy.orm import declarative_base
 
-from doctrine_monitor import read_doctrine_watchlist
+from doctrine_monitor import read_doctrine_watchlist, get_doctrine_status_optimized
 from models import MarketStats
 
 sql_logger = logging.getLogger('mkt_structures.sql_handler')
@@ -51,6 +51,10 @@ stats_columns = [
     'timestamp'
 ]
 
+
+def create_tables(database):
+    engine = create_engine(database, echo=False)
+    Base.metadata.create_all(engine)
 
 def insert_pd_timestamp(df: pd.DataFrame) -> pd.DataFrame:
     df2 = df.copy()
@@ -157,26 +161,6 @@ def process_pd_dataframe(
 
     return df
 
-
-
-def insert_pd_type_names(df: pd.DataFrame) -> pd.DataFrame:
-    engine = create_engine(mkt_sqlfile, echo=False)
-
-    match_type_ids = """
-       SELECT typeID, typeName FROM JoinedInvTypes
-       """
-
-    with engine.connect() as conn:
-        result = conn.execute(text(match_type_ids))
-        type_mappings = result.fetchall()
-
-    names = pd.DataFrame(type_mappings, columns=['type_id', 'type_name'])
-
-    df2 = df.copy()
-    df2 = df2.merge(names, on='type_id', how='left')
-
-    return df2
-
 def process_esi_market_order_optimized(data: List[dict], is_history: bool = False) -> str:
     # Create a DataFrame from the list of dictionaries
     df = pd.DataFrame(data)
@@ -201,7 +185,6 @@ def process_esi_market_order_optimized(data: List[dict], is_history: bool = Fals
             raise
     sql_logger.info(print("{status} Doctrine items loading completed successfully!"))
     return status
-
 
 def read_history(doys: int = 30) -> pd.DataFrame:
     engine = create_engine(mkt_sqlfile, echo=False)
@@ -309,8 +292,6 @@ def update_stats(df: pd.DataFrame) -> str:
         sql_logger.error(f"Error occurred: {str(e)}")
         raise
 
-
-
 def optimize_for_bulk_update(engine):
     # Optimize database settings for bulk insert
     sql_logger.info('optimizing for bulk update')
@@ -335,7 +316,7 @@ def read_sql_watchlist() -> pd.DataFrame:
         })
     # check to make sure there are not any doctrine items not included in the
     # current watchlist
-    _, doc = read_doctrine_watchlist()
+    _, doc = read_doctrine_watchlist() or (None, None)
     missing = doc[~doc['type_id'].isin(df['type_id'])]
     if missing.empty:
         sql_logger.info("no missing items found, returning watchlist")
@@ -374,4 +355,5 @@ def update_market_basket(df: pd.DataFrame) -> str:
     return "Market basket loading completed successfully!"
 
 if __name__ == "__main__":
-    pass
+    df = get_doctrine_status_optimized(20)
+    print(df.dtypes)
