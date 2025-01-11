@@ -10,9 +10,10 @@ import requests
 from pandas.core.interchange.dataframe_protocol import DataFrame
 from requests import ReadTimeout
 
+import doctrine_monitor
 import google_sheet_updater
 from ESI_OAUTH_FLOW import get_token
-from doctrine_monitor import read_doctrine_watchlist, get_doctrine_status_optimized
+from doctrine_monitor import get_doctrine_status_optimized
 from file_cleanup import rename_move_and_archive_csv
 from get_jita_prices import get_jita_prices
 from logging_tool import configure_logging
@@ -291,6 +292,7 @@ def aggregate_sell_orders(market_orders_json: any) -> pd.DataFrame:
     merged_df = pd.merge(merged_df, percentile_5th_df, on="type_id")
     logger.info("successfully merged dataframes and completed aggregation | aggregate_sell_orders()")
     logger.info(f"returning merged dataframe with {len(merged_df)} rows | aggregate_sell_orders()")
+
     return merged_df
 
 def merge_market_stats(merged_orders: pd.DataFrame, history_data: pd.DataFrame):
@@ -345,8 +347,10 @@ def update_doctrine_status(target: int = 20):
     logger.info("checking doctrines | update_doctrine_status()")
     target_df = get_doctrine_status_optimized(target=target)
     status = google_sheet_updater.google_sheet_updater_doctrine_items(target_df)
+    doc_db_update = doctrine_monitor.update_doctrine_stats()
     print(target_df.dtypes)
     logger.info(f'update_doctrine_status() {status}')
+    logger.info(f'doc_db_update {doc_db_update} items updated')
     target_df.to_csv("output/latest/target_doctrines.csv", index=False)
     logger.info(print("Completed doctrines check | update_doctrine_status()"))
 
@@ -375,13 +379,13 @@ def save_data(history: DataFrame, vale_jita: DataFrame, final_data: DataFrame, f
             "volume",
         ]
         history = history[new_columns]
-        history[update_time] = update_time
+        history['update_time'] = update_time
         history.to_csv(history_filename, index=False)
 
     logger.info("saving market stats to csv")
     final_data['timestamp'] = update_time
-    final_data.to_csv(market_stats_filename, index=False)
-
+    final_data.to_csv(market_stats_filename, index=False
+                      )
     logger.info(print('saving market stats to database'))
     status = update_stats(final_data)
     logger.info(status)
@@ -417,7 +421,7 @@ if __name__ == "__main__":
     # retrieve current watchlist from database
     logger.info(f"reading watchlist from database")
     watchlist = read_sql_watchlist()
-    doctrine_watchlist, _ = read_doctrine_watchlist()
+    # doctrine_watchlist, _ = read_doctrine_watchlist()
     logger.info(f"retrieved {len(watchlist)} type_ids. watchlist is:  {type(watchlist)}")
 
     logger.info("MARKET ORDERS")

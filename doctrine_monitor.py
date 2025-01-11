@@ -133,12 +133,6 @@ def get_doctrine_status_optimized(target: int = 20) -> pd.DataFrame:
 
     df = df4.copy()
 
-    # old_cols = ['type_id', 'type_name', 'quantity', 'fit_name', 'ship_type_name','ship_type_id', 'fit_id',
-    #             'total_volume_remain', 'min_price', 'price_5th_percentile', 'avg_of_avg_price', 'avg_daily_volume',
-    #             'group_id', 'group_name', 'category_id', 'category_name', 'days_remaining', 'timestamp',
-    #             'fits_on_market', 'delta', 'id','doctrine_id', 'name', 'icon_url', 'description', 'created',
-    #             'last_updated']
-
     drop_cols = ['icon_url', 'description', 'created', 'last_updated', 'id', 'min_price']
     df.drop(columns=drop_cols, inplace=True)
     df.reset_index(drop=True, inplace=True)
@@ -179,29 +173,13 @@ def read_doctrine_watchlist() -> tuple[list, pd.DataFrame | None]:
             """
             # Execute query and convert to DataFrame
             df = pd.read_sql_query(query, connection)
-
+        print(df.head())
         # merge in type info for compatability with Mkt Sql file
         engine = create_engine(mkt_sqlfile)
         with engine.connect() as conn:
             type_info = pd.read_sql_table('JoinedInvTypes', conn)
-            old_cols = ['typeID', 'groupID', 'typeName', 'groupName', 'categoryID',
-                        'categoryName']
-            drop_cols = ['categoryID_2', 'metaGroupID', 'metaGroupID_2',
-                         'metaGroupName']
-            new_cols = ['type_id', 'group_id', 'type_name', 'group_name', 'category_id',
-                        'category_name']
-
-        type_info.drop(columns=drop_cols, inplace=True)
-        type_info.rename(columns=dict(zip(old_cols, new_cols)), inplace=True)
-
-        df2 = pd.merge(df, type_info, on='type_id', how='left')
-
-        df2.reset_index(drop=True, inplace=True)
-        df3 = df2.infer_objects()
-        # Convert to list and return
-        id_list = df['type_id'].tolist()
-
-        return id_list, df3
+        pd.set_option('display.max_columns', None)
+        print(type_info.head())
 
     except exc.OperationalError as e:
         logger.error(f"Database connection error: {str(e)}")
@@ -210,8 +188,43 @@ def read_doctrine_watchlist() -> tuple[list, pd.DataFrame | None]:
     except Exception as e:
         logger.error(f"Unexpected error: {str(e)}")
 
+    old_cols = ['typeID', 'groupID', 'typeName', 'groupName', 'categoryID',
+                'categoryName']
+    drop_cols = ['metaGroupID',
+                 'metaGroupName']
+    new_cols = ['type_id', 'group_id', 'type_name', 'group_name', 'category_id',
+                'category_name']
+
+    type_info.drop(columns=drop_cols, inplace=True)
+    type_info.rename(columns=dict(zip(old_cols, new_cols)), inplace=True)
+
+    df2 = pd.merge(df, type_info, on='type_id', how='left')
+
+    df2.reset_index(drop=True, inplace=True)
+    print(df2.head())
+    df3 = df2.infer_objects()
+    # Convert to list and return
+    id_list = df3['type_id'].tolist()
+    #
+    return id_list, df3
 
 
+def update_doctrine_stats():
+    df = get_doctrine_status_optimized()
+    engine = create_engine(mkt_sqlfile)
+
+    reordered_cols = ['fit id', 'type id', 'category', 'fit', 'ship', 'item', 'qty', 'stock', 'fits',
+                      'days', '4H price', 'avg vol', 'avg price', 'delta', 'doctrine', 'group', 'cat id',
+                      'grp id', 'doc id', 'ship id', 'timestamp']
+    cols = ['fit_id', 'type_id', 'category', 'fit', 'ship', 'item', 'qty', 'stock', 'fits', 'days', 'price_4h',
+            'avg_vol', 'avg_price', 'delta', 'doctrine', 'group', 'cat_id', 'grp_id', 'doc_id', 'ship_id', 'timestamp']
+
+    colszip = zip(reordered_cols, cols)
+    df2 = df.rename(columns=dict(colszip))
+
+    with engine.connect() as conn:
+        status = df2.to_sql('Doctrines', conn, if_exists='replace', index=False)
+    print(f'database update completed for {status} doctrine items')
 
 if __name__ == "__main__":
     pass

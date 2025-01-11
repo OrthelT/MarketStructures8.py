@@ -2,11 +2,12 @@ import logging
 from datetime import datetime, timezone
 from typing import List
 
+import matplotlib.pyplot as plt
 import pandas as pd
 from sqlalchemy import (create_engine, text)
 from sqlalchemy.orm import declarative_base
 
-from doctrine_monitor import read_doctrine_watchlist, get_doctrine_status_optimized
+from doctrine_monitor import read_doctrine_watchlist
 from models import MarketStats
 
 sql_logger = logging.getLogger('mkt_structures.sql_handler')
@@ -354,6 +355,58 @@ def update_market_basket(df: pd.DataFrame) -> str:
     engine.dispose()
     return "Market basket loading completed successfully!"
 
+
+def update_hist_expanded_group_category():
+    statement1 = """
+    UPDATE history_expanded
+    SET
+        category_id = JoinedInvTypes.categoryID,
+        category_name = JoinedInvTypes.categoryName,
+        group_id = JoinedInvTypes.groupID,
+        group_name = JoinedInvTypes.groupName
+    FROM
+        JoinedInvTypes
+    WHERE
+        history_expanded.type_id = JoinedInvTypes.typeID;
+    """
+
+
+def plot_ship_volume(ship_group_id):
+    engine = create_engine(mkt_sqlfile, echo=False)
+    statement1 = f"""
+      SELECT * FROM market_history
+      WHERE market_history.category_id = 6
+      AND market_history.group_id = {ship_group_id}
+      AND market_history.date > 2024-08-01;
+      """
+    with engine.connect() as conn:
+        df = pd.read_sql_query(statement1, conn)
+
+    # Ensure 'date' is in datetime format
+    df['date'] = pd.to_datetime(df['date'])
+
+    ship_name = df[df['group_id'] == ship_group_id]['group_name'].unique()[0]
+    print(ship_name)
+    # Filter for Battleships
+    ship_df = df[df['group_id'] == ship_group_id]
+    ship_df = ship_df.sort_values(by='date')
+    ship_df = ship_df.reset_index(drop=True)
+    ship_df = ship_df[ship_df['date'] > '2024-01-01']
+    ship_df = ship_df[ship_df['type_id'] == 17732]
+    # Group by date and sum volumes
+    daily_volume = ship_df.groupby(['date', 'type_name'])['volume'].sum().reset_index()
+
+    pivoted = daily_volume.pivot(index='date', columns='type_name', values='volume')
+
+    # Plot the data
+    plt.figure(figsize=(15, 6))
+    pivoted.plot(kind='line', marker='o', title=f'Daily Volume for {ship_name}')
+    plt.xlabel('Date')
+    plt.ylabel('Volume')
+    plt.grid(True)
+    plt.tight_layout()
+    plt.show()
+
+    engine.dispose()
 if __name__ == "__main__":
-    df = get_doctrine_status_optimized(20)
-    print(df.dtypes)
+    pass
