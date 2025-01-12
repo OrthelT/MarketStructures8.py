@@ -173,13 +173,11 @@ def read_doctrine_watchlist() -> tuple[list, pd.DataFrame | None]:
             """
             # Execute query and convert to DataFrame
             df = pd.read_sql_query(query, connection)
-        print(df.head())
         # merge in type info for compatability with Mkt Sql file
         engine = create_engine(mkt_sqlfile)
         with engine.connect() as conn:
             type_info = pd.read_sql_table('JoinedInvTypes', conn)
         pd.set_option('display.max_columns', None)
-        print(type_info.head())
 
     except exc.OperationalError as e:
         logger.error(f"Database connection error: {str(e)}")
@@ -201,7 +199,6 @@ def read_doctrine_watchlist() -> tuple[list, pd.DataFrame | None]:
     df2 = pd.merge(df, type_info, on='type_id', how='left')
 
     df2.reset_index(drop=True, inplace=True)
-    print(df2.head())
     df3 = df2.infer_objects()
     # Convert to list and return
     id_list = df3['type_id'].tolist()

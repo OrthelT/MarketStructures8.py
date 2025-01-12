@@ -27,6 +27,7 @@ def google_mkt_sheet_updater() -> str:
     gc = get_credentials(SCOPES)
 
     df = read_sql_market_stats()
+
     new_cols = ['type_id', 'type_name', 'days_remaining', 'total_volume_remain', 'price_5th_percentile',
                 'avg_daily_volume', 'avg_of_avg_price', 'min_price', 'group_name', 'category_name',
                 'group_id', 'category_id', 'timestamp']
@@ -38,11 +39,14 @@ def google_mkt_sheet_updater() -> str:
 
     # Clean the DataFrame to ensure JSON compliance
     df = df.infer_objects()
-    df = fill_na(df)
+    df2 = fill_na(df)
     # access credentials to update Google sheets
     # Convert DataFrame to a list of lists (Google Sheets format)
-    data_list = [df.columns.tolist()] + df.astype(str).values.tolist()
+
+    data_list = [df2.columns.tolist()] + df2.astype(str).values.tolist()
+
     # Open the Google Sheet Workbook by name
+
     wb = gc.open("4H Market Status")
     sheet = wb.worksheet("MarketStats")
 
@@ -130,4 +134,5 @@ def gsheet_image_updater(df: pd.DataFrame):
 
 
 if __name__ == "__main__":
-    pass
+    df = google_mkt_sheet_updater()
+    print(df['type_id'].unique())

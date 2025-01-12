@@ -92,50 +92,6 @@ def insert_pd_type_names(df: pd.DataFrame) -> pd.DataFrame:
     return df2
 
 
-def fill_missing_stats() -> str:
-    stats = read_sql_market_stats()
-    watchlist = read_sql_watchlist()
-
-    stats['type_id'] = stats['type_id'].astype(int)
-
-    missing = watchlist[~watchlist['type_id'].isin(stats['type_id'])]
-
-    missing_df = pd.DataFrame(
-        columns=['type_id', 'total_volume_remain', 'min_price', 'price_5th_percentile',
-                 'avg_of_avg_price', 'avg_daily_volume', 'group_id', 'type_name',
-                 'group_name', 'category_id', 'category_name', 'days_remaining', 'timestamp'])
-    missing_df = pd.concat([missing, missing_df])
-    missing_df['total_volume_remain'] = stats['total_volume_remain']
-
-    # fill historical values where available
-    hist = read_history(30)
-    hist_grouped = hist.groupby("type_id").agg({'average': 'mean', 'volume': 'mean'})
-    missing_df['avg_of_avg_price'] = missing_df['type_id'].map(hist_grouped['average'])
-    missing_df['avg_daily_volume'] = missing_df['type_id'].map(hist_grouped['volume'])
-
-    # all null values must die
-    missing_df = missing_df.infer_objects()
-    missing_df = missing_df.fillna(0)
-
-    # put timestamps back in because SQL Alchemy will very cross with us
-    # if we put zeros in the timestamp column while nuking the null values
-    # datetime values can never be 0
-    missing_df['timestamp'] = stats['timestamp']
-
-    # update the database
-    engine = create_engine(mkt_sqlfile, echo=False)
-    try:
-        with engine.connect() as conn:
-            missing_df.to_sql('Market_Stats', engine,
-                              if_exists='append',
-                              index=False,
-                              method='multi',
-                              chunksize=1000
-                              )
-        return "missing Stats loading completed successfully!"
-    except Exception as e:
-        sql_logger.error(f"Error occurred: {str(e)}")
-        raise
 
 def process_pd_dataframe(
         df: pd.DataFrame, columns: list, date_column: str = None
@@ -286,8 +242,6 @@ def update_stats(df: pd.DataFrame) -> str:
                             method='multi',
                             chunksize=1000)
         status = "Data loading completed successfully!"
-        missing_status = fill_missing_stats()
-        status = status + missing_status
         return status
     except Exception as e:
         sql_logger.error(f"Error occurred: {str(e)}")
@@ -355,7 +309,6 @@ def update_market_basket(df: pd.DataFrame) -> str:
     engine.dispose()
     return "Market basket loading completed successfully!"
 
-
 def update_hist_expanded_group_category():
     statement1 = """
     UPDATE history_expanded
@@ -369,7 +322,6 @@ def update_hist_expanded_group_category():
     WHERE
         history_expanded.type_id = JoinedInvTypes.typeID;
     """
-
 
 def plot_ship_volume(ship_group_id):
     engine = create_engine(mkt_sqlfile, echo=False)
@@ -408,5 +360,35 @@ def plot_ship_volume(ship_group_id):
     plt.show()
 
     engine.dispose()
+
+
+def fill_missing_stats_v2(df):
+    stats = df
+    watchlist = read_sql_watchlist()
+
+    stats['type_id'] = stats['type_id'].astype(int)
+
+    missing = watchlist[~watchlist['type_id'].isin(stats['type_id'])]
+
+    missing_df = pd.DataFrame(
+        columns=['type_id', 'total_volume_remain', 'min_price', 'price_5th_percentile',
+                 'avg_of_avg_price', 'avg_daily_volume', 'group_id', 'type_name',
+                 'group_name', 'category_id', 'category_name', 'days_remaining', 'timestamp'])
+    missing_df = pd.concat([missing, missing_df])
+    missing_df['total_volume_remain'] = 0
+
+    # fill historical values where available
+    hist = read_history(30)
+    hist_grouped = hist.groupby("type_id").agg({'average': 'mean', 'volume': 'mean'})
+    missing_df['avg_of_avg_price'] = missing_df['type_id'].map(hist_grouped['average'])
+    missing_df['avg_daily_volume'] = missing_df['type_id'].map(hist_grouped['volume'])
+
+    # all null values must die
+    missing_df = missing_df.infer_objects()
+    missing_df = missing_df.fillna(0)
+
+    return missing_df
+
+
 if __name__ == "__main__":
     pass
