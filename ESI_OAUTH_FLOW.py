@@ -16,7 +16,7 @@ os.environ["OAUTHLIB_INSECURE_TRANSPORT"] = (
 )
 CLIENT_ID = os.getenv("CLIENT_ID")  # stored in you .env file
 SECRET_KEY = os.getenv("SECRET_KEY")  # stored in you .env file
-REDIRECT_URI = "http://localhost:8000/callback"  # workaround so we don't have to set up a real server
+CALLBACK_URI = "http://localhost:8000/callback"  # workaround so we don't have to set up a real server
 AUTHORIZATION_URL = "https://login.eveonline.com/v2/oauth/authorize"
 TOKEN_URL = "https://login.eveonline.com/v2/oauth/token"
 token_file = "token.json"
@@ -113,7 +113,7 @@ def get_oauth_session(token=None, requested_scope=None):
         )
     else:
         return OAuth2Session(
-            CLIENT_ID, redirect_uri=REDIRECT_URI, scope=requested_scope
+            CLIENT_ID, redirect_uri=CALLBACK_URI, scope=requested_scope
         )
 
 

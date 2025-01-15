@@ -413,7 +413,7 @@ if __name__ == "__main__":
     # Main function where everything gets executed.
 
     # Update full market history with fresh data?
-    fresh_data_choice = False
+    fresh_data_choice = True
 
     start_time = datetime.now()
     logger.info(f"starting program: {start_time}")
