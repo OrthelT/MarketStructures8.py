@@ -155,7 +155,6 @@ def get_doctrine_status_optimized(target: int = 20) -> pd.DataFrame:
 
     return df
 
-
 def read_doctrine_watchlist() -> pd.DataFrame:
     logger.info('reading doctrine watchlist')
     try:
@@ -233,7 +232,6 @@ def update_doctrine_stats():
     with engine.connect() as conn:
         status = df.to_sql('Doctrines', conn, if_exists='replace', index=False)
     print(f'database update completed for {status} doctrine items')
-
 
 def get_doctrines_on_market() -> pd.DataFrame:
     df = get_doctrine_status_optimized()

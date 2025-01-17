@@ -72,20 +72,36 @@ def insert_pd_timestamp(df: pd.DataFrame) -> pd.DataFrame:
 
 def insert_pd_type_names(df: pd.DataFrame) -> pd.DataFrame:
     engine = create_engine(mkt_sqlfile, echo=False)
+    ids = df['type_id'].unique().tolist()
 
-    match_type_ids = """
-       SELECT typeID, typeName FROM JoinedInvTypes
-       """
+    # Generate named placeholders dynamically
+    placeholders = ",".join([f":id{i}" for i in range(len(ids))])
 
+    # SQL query with named placeholders
+    query = text(f"""
+        SELECT typeID, typeName 
+        FROM JoinedInvTypes
+        WHERE typeID IN ({placeholders})
+    """)
+
+    # Create a dictionary of named parameters
+    params = {f"id{i}": value for i, value in enumerate(ids)}
+
+    # Execute the query with named parameters
     with engine.connect() as conn:
-        result = conn.execute(text(match_type_ids))
-        type_mappings = result.fetchall()
+        result = conn.execute(query, params)
+        results = result.fetchall()
 
-    names = pd.DataFrame(type_mappings, columns=['type_id', 'type_name'])
+    names = pd.DataFrame(results, columns=['type_id', 'type_name'])
 
-    df2 = df.copy()
-    df2 = df2.merge(names, on='type_id', how='left')
+    print(df.head())
+    df.drop(columns=['type_name'], inplace=True, errors='ignore')
+    df2 = df.merge(names, on='type_id', how='left')
+    names = df2['type_name']
+    df2.drop(columns=['type_name'], inplace=True)
 
+    df2.insert(1, 'type_name', names)
+    print(df2.head())
     return df2
 
 def process_pd_dataframe(
@@ -285,7 +301,6 @@ def read_sql_market_stats() -> pd.DataFrame:
     with engine.connect() as conn:
         df = pd.read_sql_table('Market_Stats', conn)
     return df
-
 
 def fill_missing_stats_v2(df) -> pd.DataFrame:
     sql_logger.info('checking missing stats...starting')

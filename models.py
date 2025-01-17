@@ -110,5 +110,31 @@ class Doctrines(Base):
     timestamp: Mapped[datetime] = mapped_column(DateTime)
 
 
+class DataMaps(Base):
+    __tablename__ = "data_maps"
+    data_instance: Mapped[str] = mapped_column(String(100), primary_key=True)
+    type_id: Mapped[int] = mapped_column(Integer, nullable=True)
+    type_name: Mapped[Optional[str]] = mapped_column(String(100))
+    stock: Mapped[int] = mapped_column(Integer, nullable=True)
+    min_price: Mapped[float] = mapped_column(Float, nullable=True)
+    price: Mapped[float] = mapped_column(Float, nullable=True)
+    avg_price: Mapped[float] = mapped_column(Float, nullable=True)
+    avg_volume: Mapped[float] = mapped_column(Float, nullable=True)
+    group: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    group_id: Mapped[str] = mapped_column(String(10))
+    category: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    category_id: Mapped[str] = mapped_column(String(10))
+    days: Mapped[int] = mapped_column(Integer, nullable=True)
+    fit_id: Mapped[int] = mapped_column(Integer, nullable=True)
+    fits: Mapped[float] = mapped_column(Float, nullable=True)
+    fit: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    doctrine: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    doctrine_id: Mapped[int] = mapped_column(Integer, nullable=True)
+    ship: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    ship_id: Mapped[int] = mapped_column(Integer, nullable=True)
+    qty: Mapped[int] = mapped_column(Integer, nullable=True)
+    timestamp: Mapped[datetime] = mapped_column(DateTime)
+
+
 if __name__ == '__main__':
     pass

@@ -316,7 +316,6 @@ def validate_dataframe(df: pd.DataFrame):
 
     return validated_data, errors
 
-
 def update_market_basket(df: pd.DataFrame) -> str:
     sql_logger.info("Updating market basket...")
     engine = create_engine(mkt_sqlfile, echo=True)
@@ -324,7 +323,6 @@ def update_market_basket(df: pd.DataFrame) -> str:
         df.to_sql('MarketBasket', con=conn, if_exists='append', index=False, chunksize=1000)
     engine.dispose()
     return "Market basket loading completed successfully!"
-
 
 def update_hist_expanded_group_category():
     statement1 = """
@@ -339,7 +337,6 @@ def update_hist_expanded_group_category():
     WHERE
         history_expanded.type_id = JoinedInvTypes.typeID;
     """
-
 
 def plot_ship_volume(ship_group_id):
     engine = create_engine(mkt_sqlfile, echo=False)
