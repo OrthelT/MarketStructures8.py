@@ -20,8 +20,6 @@ def get_doctrine_status_optimized(watchlist, target: int = 20) -> pd.DataFrame:
     with engine.connect() as conn:
         market_stats = pd.read_sql_table('Market_Stats', conn)
 
-    market_stats = fill_missing_stats_v2(market_stats, watchlist)
-
     market_stats['type_id'] = market_stats['type_id'].astype(int)
 
     target_df = target_items.merge(market_stats, on='type_id', how='left')
@@ -128,6 +126,9 @@ def fill_missing_stats_v2(df: pd.DataFrame, watchlist: pd.DataFrame) -> pd.DataF
     shared_logger.info('checking missing stats...starting')
     stats = df
 
+    if 'type id' in stats.columns:
+        stats.rename(columns={'type id': 'type_id'}, inplace=True)
+
     stats['type_id'] = stats['type_id'].astype(int)
 
     missing = watchlist[~watchlist['type_id'].isin(stats['type_id'])]
@@ -139,11 +140,12 @@ def fill_missing_stats_v2(df: pd.DataFrame, watchlist: pd.DataFrame) -> pd.DataF
                  'group_name', 'category_id', 'category_name', 'days_remaining', 'timestamp'])
     missing_df = pd.concat([missing, missing_df])
     missing_df['total_volume_remain'] = 0
-
+    len_missing = len(missing_df)
+    print(len_missing)
     # fill historical values where available
     engine = create_engine(mkt_sqldb, echo=False)
     days_hist = 30
-    # Create a session factoryf
+    # Create a session factory
     session = engine.connect()
     shared_logger.info(f'connection established: {session} by sql_handler.read_history()')
     d = f"'-{days_hist} days'"
@@ -165,7 +167,15 @@ def fill_missing_stats_v2(df: pd.DataFrame, watchlist: pd.DataFrame) -> pd.DataF
     missing_df = missing_df.fillna(0)
     shared_logger.info('missing stats updated')
     updated_df = pd.concat([stats, missing_df])
-    return updated_df
+    updated_df = updated_df.infer_objects()
+    print(f'LENGTH: {len(updated_df)}')
+
+    de_duped_df = updated_df.drop_duplicates()
+    dropped_duplicates = len(updated_df) - len(de_duped_df)
+    print(f'LENGTH: {len(de_duped_df)}')
+    print(f'DROPPED DUPLICATES: {dropped_duplicates}')
+
+    return de_duped_df
 
 
 if __name__ == '__main__':

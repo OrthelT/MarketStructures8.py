@@ -53,6 +53,9 @@ def get_doctrine_fits(db_name: str = 'wc_fitting') -> pd.DataFrame:
     with engine.connect() as conn:
         logger.info('reading fittings_fitting and joining fittings_type')
         df = pd.read_sql_query(query3, engine)
+
+    df = df[~df['name'].str.startswith("zz ")].reset_index()
+
     return df
 
 def get_fit_items(df: pd.DataFrame, id_list: list):

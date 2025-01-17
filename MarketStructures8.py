@@ -346,6 +346,9 @@ def history_merge(history_data: pd.DataFrame) -> pd.DataFrame:
 def update_doctrine_status(target: int = 20):
     logger.info("checking doctrines | update_doctrine_status()")
     target_df = get_doctrine_status_optimized(watchlist, target=target)
+    target_df = target_df[~target_df['fit'].str.startswith("zz ")]
+
+    target_df.to_csv("output/latest/doctrines_on_market.csv", index=False)
     status = google_sheet_updater.google_sheet_updater_doctrine_items(target_df)
     doc_db_update = update_doctrine_stats()
     print(target_df.dtypes)
@@ -394,13 +397,8 @@ def save_data(history: DataFrame, vale_jita: DataFrame, final_data: DataFrame, f
         ))
 
     final_data = fill_missing_stats_v2(final_data, watchlist)
-
     logger.info("saving market stats to csv")
     final_data.to_csv(market_stats_filename, index=False)
-
-    logger.info('updating doctrine status csv')
-    df = get_doctrine_status_optimized(watchlist)
-    df.to_csv("output/latest/doctrines_on_market.csv", index=False)
 
     logger.info('updating google sheet')
     google_sheet_updater.google_mkt_sheet_updater()
