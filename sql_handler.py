@@ -2,13 +2,11 @@ import logging
 from datetime import datetime, timezone
 from typing import List
 
-import matplotlib.pyplot as plt
 import pandas as pd
 from sqlalchemy import (create_engine, text)
 from sqlalchemy.orm import declarative_base
 
 from doctrine_monitor import read_doctrine_watchlist
-from models import MarketStats
 
 sql_logger = logging.getLogger('mkt_structures.sql_handler')
 
@@ -72,7 +70,6 @@ def insert_pd_timestamp(df: pd.DataFrame) -> pd.DataFrame:
     df2.loc[:, "timestamp"] = ts
     return df2
 
-
 def insert_pd_type_names(df: pd.DataFrame) -> pd.DataFrame:
     engine = create_engine(mkt_sqlfile, echo=False)
 
@@ -90,8 +87,6 @@ def insert_pd_type_names(df: pd.DataFrame) -> pd.DataFrame:
     df2 = df2.merge(names, on='type_id', how='left')
 
     return df2
-
-
 
 def process_pd_dataframe(
         df: pd.DataFrame, columns: list, date_column: str = None
@@ -271,14 +266,17 @@ def read_sql_watchlist() -> pd.DataFrame:
         })
     # check to make sure there are not any doctrine items not included in the
     # current watchlist
-    _, doc = read_doctrine_watchlist() or (None, None)
+    doc = read_doctrine_watchlist()
+
     missing = doc[~doc['type_id'].isin(df['type_id'])]
+
     if missing.empty:
         sql_logger.info("no missing items found, returning watchlist")
     else:
         sql_logger.info("missing items found, merging doctrine_ids into watchlist")
-        df = df.merge(missing, on='type_id', how='left')
+        df = pd.concat([df, missing])
         df.reset_index(inplace=True, drop=True)
+    df.drop(columns=['categoryID_2', 'metaGroupID_2'], inplace=True)
 
     return df
 
@@ -288,88 +286,17 @@ def read_sql_market_stats() -> pd.DataFrame:
         df = pd.read_sql_table('Market_Stats', conn)
     return df
 
-def validate_dataframe(df: pd.DataFrame):
-    validated_data = []
-    errors = []
 
-    for index, row in df.iterrows():
-        try:
-            record = MarketStats(**row.to_dict())
-            validated_data.append(record)
-        except Exception as e:
-            errors.append((index, str(e)))
-
-    return validated_data, errors
-
-def update_market_basket(df: pd.DataFrame) -> str:
-    sql_logger.info("Updating market basket...")
-    engine = create_engine(mkt_sqlfile, echo=True)
-    with engine.connect() as conn:
-        df.to_sql('MarketBasket', con=conn, if_exists='append', index=False, chunksize=1000)
-    engine.dispose()
-    return "Market basket loading completed successfully!"
-
-def update_hist_expanded_group_category():
-    statement1 = """
-    UPDATE history_expanded
-    SET
-        category_id = JoinedInvTypes.categoryID,
-        category_name = JoinedInvTypes.categoryName,
-        group_id = JoinedInvTypes.groupID,
-        group_name = JoinedInvTypes.groupName
-    FROM
-        JoinedInvTypes
-    WHERE
-        history_expanded.type_id = JoinedInvTypes.typeID;
-    """
-
-def plot_ship_volume(ship_group_id):
-    engine = create_engine(mkt_sqlfile, echo=False)
-    statement1 = f"""
-      SELECT * FROM market_history
-      WHERE market_history.category_id = 6
-      AND market_history.group_id = {ship_group_id}
-      AND market_history.date > 2024-08-01;
-      """
-    with engine.connect() as conn:
-        df = pd.read_sql_query(statement1, conn)
-
-    # Ensure 'date' is in datetime format
-    df['date'] = pd.to_datetime(df['date'])
-
-    ship_name = df[df['group_id'] == ship_group_id]['group_name'].unique()[0]
-    print(ship_name)
-    # Filter for Battleships
-    ship_df = df[df['group_id'] == ship_group_id]
-    ship_df = ship_df.sort_values(by='date')
-    ship_df = ship_df.reset_index(drop=True)
-    ship_df = ship_df[ship_df['date'] > '2024-01-01']
-    ship_df = ship_df[ship_df['type_id'] == 17732]
-    # Group by date and sum volumes
-    daily_volume = ship_df.groupby(['date', 'type_name'])['volume'].sum().reset_index()
-
-    pivoted = daily_volume.pivot(index='date', columns='type_name', values='volume')
-
-    # Plot the data
-    plt.figure(figsize=(15, 6))
-    pivoted.plot(kind='line', marker='o', title=f'Daily Volume for {ship_name}')
-    plt.xlabel('Date')
-    plt.ylabel('Volume')
-    plt.grid(True)
-    plt.tight_layout()
-    plt.show()
-
-    engine.dispose()
-
-
-def fill_missing_stats_v2(df):
+def fill_missing_stats_v2(df) -> pd.DataFrame:
+    sql_logger.info('checking missing stats...starting')
     stats = df
     watchlist = read_sql_watchlist()
 
     stats['type_id'] = stats['type_id'].astype(int)
 
     missing = watchlist[~watchlist['type_id'].isin(stats['type_id'])]
-
+    missing.reset_index(inplace=True, drop=True)
+    print(f'found missing items: {len(missing)}. Filling from history data.')
     missing_df = pd.DataFrame(
         columns=['type_id', 'total_volume_remain', 'min_price', 'price_5th_percentile',
                  'avg_of_avg_price', 'avg_daily_volume', 'group_id', 'type_name',
@@ -386,7 +313,7 @@ def fill_missing_stats_v2(df):
     # all null values must die
     missing_df = missing_df.infer_objects()
     missing_df = missing_df.fillna(0)
-
+    sql_logger.info('missing stats updated')
     return missing_df
 
 

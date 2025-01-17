@@ -113,6 +113,7 @@ def get_doctrine_status_optimized(target: int = 20) -> pd.DataFrame:
         market_stats = pd.read_sql_table('Market_Stats', conn)
 
     market_stats['type_id'] = market_stats['type_id'].astype(int)
+
     target_df = target_items.merge(market_stats, on='type_id', how='left')
     target_df.drop(columns=['type_name_y'], inplace=True)
     target_df.rename(columns={'type_name_x': 'type_name', 'doctrine_name': 'fit_name'}, inplace=True)
@@ -154,13 +155,17 @@ def get_doctrine_status_optimized(target: int = 20) -> pd.DataFrame:
 
     return df
 
-def read_doctrine_watchlist() -> tuple[list, pd.DataFrame | None]:
+
+def read_doctrine_watchlist() -> pd.DataFrame:
     logger.info('reading doctrine watchlist')
     try:
         # Create the connection string without quotes around database name
         mysql_connection = fit_mysqlfile
         # Create engine with echo=True to see SQL output for debugging
-        engine = sqlalchemy.create_engine(mysql_connection, echo=True)
+        engine = sqlalchemy.create_engine(mysql_connection, echo=False)
+        logger.info('MySql db connection established')
+        logger.info('accessing doctrines...')
+
         # Test the connection before executing query
         with engine.connect() as connection:
             # Your SQL query
@@ -173,11 +178,16 @@ def read_doctrine_watchlist() -> tuple[list, pd.DataFrame | None]:
             """
             # Execute query and convert to DataFrame
             df = pd.read_sql_query(query, connection)
+            print(f"""
+            ===============
+            Doctrine watchlist retrieved: {len(df)} items
+            columns: {df.columns}
+            
+            """)
         # merge in type info for compatability with Mkt Sql file
         engine = create_engine(mkt_sqlfile)
         with engine.connect() as conn:
             type_info = pd.read_sql_table('JoinedInvTypes', conn)
-        pd.set_option('display.max_columns', None)
 
     except exc.OperationalError as e:
         logger.error(f"Database connection error: {str(e)}")
@@ -202,26 +212,52 @@ def read_doctrine_watchlist() -> tuple[list, pd.DataFrame | None]:
     df3 = df2.infer_objects()
     # Convert to list and return
     id_list = df3['type_id'].tolist()
-    #
-    return id_list, df3
-
+    print(len(id_list))
+    return df3
 
 def update_doctrine_stats():
     df = get_doctrine_status_optimized()
+    print(df.head())
     engine = create_engine(mkt_sqlfile)
 
     reordered_cols = ['fit id', 'type id', 'category', 'fit', 'ship', 'item', 'qty', 'stock', 'fits',
                       'days', '4H price', 'avg vol', 'avg price', 'delta', 'doctrine', 'group', 'cat id',
                       'grp id', 'doc id', 'ship id', 'timestamp']
+
     cols = ['fit_id', 'type_id', 'category', 'fit', 'ship', 'item', 'qty', 'stock', 'fits', 'days', 'price_4h',
             'avg_vol', 'avg_price', 'delta', 'doctrine', 'group', 'cat_id', 'grp_id', 'doc_id', 'ship_id', 'timestamp']
 
     colszip = zip(reordered_cols, cols)
-    df2 = df.rename(columns=dict(colszip))
+    df.rename(columns=dict(colszip), inplace=True)
 
     with engine.connect() as conn:
-        status = df2.to_sql('Doctrines', conn, if_exists='replace', index=False)
+        status = df.to_sql('Doctrines', conn, if_exists='replace', index=False)
     print(f'database update completed for {status} doctrine items')
+
+
+def get_doctrines_on_market() -> pd.DataFrame:
+    df = get_doctrine_status_optimized()
+
+    reordered_cols = ['fit id', 'type id', 'category', 'fit', 'ship', 'item', 'qty', 'stock', 'fits',
+                      'days', '4H price', 'avg vol', 'avg price', 'delta', 'doctrine', 'group', 'cat id',
+                      'grp id', 'doc id', 'ship id', 'timestamp']
+
+    cols = ['fit_id', 'type_id', 'category', 'fit', 'ship', 'item', 'qty', 'stock', 'fits', 'days', 'price_4h',
+            'avg_vol', 'avg_price', 'delta', 'doctrine', 'group', 'cat_id', 'grp_id', 'doc_id', 'ship_id', 'timestamp']
+
+    colszip = zip(reordered_cols, cols)
+    df.rename(columns=dict(colszip), inplace=True)
+
+    df2 = df[['fit_id', 'fit', 'ship', 'type_id', 'item', 'stock', 'fits', 'price_4h',
+              'avg_vol', 'avg_price', 'delta', 'timestamp', 'doctrine', 'group', 'cat_id',
+              'grp_id', 'doc_id', 'ship_id', 'timestamp']]
+
+    fit_counts = df2.groupby('type_id')['fit'].transform('count')
+    df2['fit_counts'] = fit_counts
+
+    return df2
+
+    return None
 
 if __name__ == "__main__":
     pass

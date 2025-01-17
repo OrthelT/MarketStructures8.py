@@ -382,10 +382,8 @@ def save_data(history: DataFrame, vale_jita: DataFrame, final_data: DataFrame, f
         history['update_time'] = update_time
         history.to_csv(history_filename, index=False)
 
-    logger.info("saving market stats to csv")
     final_data['timestamp'] = update_time
-    final_data.to_csv(market_stats_filename, index=False
-                      )
+
     logger.info(print('saving market stats to database'))
     status = update_stats(final_data)
     logger.info(status)
@@ -393,6 +391,15 @@ def save_data(history: DataFrame, vale_jita: DataFrame, final_data: DataFrame, f
         print(
             f"saving market stats to google sheet. update time: {update_time}"
         ))
+
+    logger.info("saving market stats to csv")
+    final_data.to_csv(market_stats_filename, index=False)
+
+    logger.info('updating doctrine status csv')
+    df = get_doctrine_status_optimized()
+    df.to_csv("output/latest/doctrines_on_market.csv", index=False)
+
+    logger.info('updating google sheet')
     google_sheet_updater.google_mkt_sheet_updater()
     # save a copy of market stats to update spreadsheet consistently named
     src_folder = r"output"
@@ -413,7 +420,7 @@ if __name__ == "__main__":
     # Main function where everything gets executed.
 
     # Update full market history with fresh data?
-    fresh_data_choice = True
+    fresh_data_choice = False
 
     start_time = datetime.now()
     logger.info(f"starting program: {start_time}")
