@@ -6,7 +6,7 @@ import pandas as pd
 from sqlalchemy import (create_engine, text)
 from sqlalchemy.orm import declarative_base
 
-from doctrine_monitor import read_doctrine_watchlist
+from shared_utils import read_doctrine_watchlist, get_doctrine_status_optimized
 
 sql_logger = logging.getLogger('mkt_structures.sql_handler')
 
@@ -302,35 +302,27 @@ def read_sql_market_stats() -> pd.DataFrame:
         df = pd.read_sql_table('Market_Stats', conn)
     return df
 
-def fill_missing_stats_v2(df) -> pd.DataFrame:
-    sql_logger.info('checking missing stats...starting')
-    stats = df
+
+def update_doctrine_stats():
     watchlist = read_sql_watchlist()
+    df = get_doctrine_status_optimized(watchlist)
+    print(df.head())
+    engine = create_engine(mkt_sqlfile)
 
-    stats['type_id'] = stats['type_id'].astype(int)
+    reordered_cols = ['fit id', 'type id', 'category', 'fit', 'ship', 'item', 'qty', 'stock', 'fits',
+                      'days', '4H price', 'avg vol', 'avg price', 'delta', 'doctrine', 'group', 'cat id',
+                      'grp id', 'doc id', 'ship id', 'timestamp']
 
-    missing = watchlist[~watchlist['type_id'].isin(stats['type_id'])]
-    missing.reset_index(inplace=True, drop=True)
-    print(f'found missing items: {len(missing)}. Filling from history data.')
-    missing_df = pd.DataFrame(
-        columns=['type_id', 'total_volume_remain', 'min_price', 'price_5th_percentile',
-                 'avg_of_avg_price', 'avg_daily_volume', 'group_id', 'type_name',
-                 'group_name', 'category_id', 'category_name', 'days_remaining', 'timestamp'])
-    missing_df = pd.concat([missing, missing_df])
-    missing_df['total_volume_remain'] = 0
+    cols = ['fit_id', 'type_id', 'category', 'fit', 'ship', 'item', 'qty', 'stock', 'fits', 'days', 'price_4h',
+            'avg_vol', 'avg_price', 'delta', 'doctrine', 'group', 'cat_id', 'grp_id', 'doc_id', 'ship_id', 'timestamp']
 
-    # fill historical values where available
-    hist = read_history(30)
-    hist_grouped = hist.groupby("type_id").agg({'average': 'mean', 'volume': 'mean'})
-    missing_df['avg_of_avg_price'] = missing_df['type_id'].map(hist_grouped['average'])
-    missing_df['avg_daily_volume'] = missing_df['type_id'].map(hist_grouped['volume'])
+    colszip = zip(reordered_cols, cols)
+    df.rename(columns=dict(colszip), inplace=True)
+    df['timestamp'] = datetime.now(timezone.utc)
 
-    # all null values must die
-    missing_df = missing_df.infer_objects()
-    missing_df = missing_df.fillna(0)
-    sql_logger.info('missing stats updated')
-    return missing_df
-
+    with engine.connect() as conn:
+        status = df.to_sql('Doctrines', conn, if_exists='replace', index=False)
+    print(f'database update completed for {status} doctrine items')
 
 if __name__ == "__main__":
     pass

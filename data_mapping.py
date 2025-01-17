@@ -1,9 +1,7 @@
-import json
 import logging
 
 import pandas as pd
 
-from MarketStructures8 import aggregate_sell_orders
 from models import DataMaps
 from sql_handler import insert_pd_type_names
 
@@ -14,8 +12,8 @@ column_mapping = {
     "stock": ["stock", "volume_remain", "total_volume_remain", "qty on mkt"],
     "min_price": ["min_price", "min price"],
     "price": ["price", "4H price", "price_5th_percentile"],
-    "avg_price": ["avg_price", "avg_of_avg_price"],
-    "avg_volume": ["avg_volume", "avg daily volume", "avg_daily_volume"],
+    "avg_price": ["avg_price", "avg_of_avg_price", 'avg price'],
+    "avg_volume": ["avg_volume", "avg daily volume", "avg_daily_volume", 'avg vol'],
     "group": ["group", "group_name"],
     "group_id": ["group_id", "grp id"],
     "category": ["category", "category_name"],
@@ -27,8 +25,8 @@ column_mapping = {
     "fit_id": ["fit_id", "fit id"],
     "doctrine": ["doctrine", "doctrine_name"],
     "doctrine_id": ["doctrine_id", "doc id"],
-    "ship": ["ship", "ship_name"],
-    "ship_id": ["ship_id", "hull_id"],
+    "ship": ["ship", "ship_name", "ship name"],
+    "ship_id": ["ship_id", "hull_id", "hull id", "ship id"],
     "qty": ["qty", "quantity", "qty_required"]
 
 }
@@ -67,8 +65,10 @@ def detect_unmapped_columns(df: pd.DataFrame, mapping: dict) -> None:
 
 
 # Function to preprocess data
-def preprocess_data(df: pd.DataFrame, mapping: dict) -> pd.DataFrame:
+def preprocess_data(df: pd.DataFrame, mapping=None) -> pd.DataFrame:
     # Detect unmapped columns
+    if mapping is None:
+        mapping = column_mapping
     detect_unmapped_columns(df, mapping)
 
     # Translate columns to common schema
@@ -84,7 +84,9 @@ def preprocess_data(df: pd.DataFrame, mapping: dict) -> pd.DataFrame:
 
 
 # Function to translate data
-def translate_to_common_schema(df: pd.DataFrame, mapping: dict) -> pd.DataFrame:
+def translate_to_common_schema(df: pd.DataFrame, mapping=None) -> pd.DataFrame:
+    if mapping is None:
+        mapping = column_mapping
     rename_map = {}
     for standard_col, variations in mapping.items():
         for col in variations:
@@ -92,7 +94,7 @@ def translate_to_common_schema(df: pd.DataFrame, mapping: dict) -> pd.DataFrame:
                 rename_map[col] = standard_col
                 break
     df = df.rename(columns=rename_map)
-    return ensure_all_columns(df, data_maps_schema)
+    return df
 
 
 # Ensure all columns exist
@@ -107,29 +109,15 @@ def create_datamaps_instances(df: pd.DataFrame) -> list:
     return [DataMaps(**row.to_dict()) for _, row in df.iterrows()]
 
 
-if __name__ == "__main__":
-    with open('tests/mkt_orders_raw.json', 'r') as f:
-        orders = json.load(f)
-
-    df = aggregate_sell_orders(orders)
-
-    processed_data = preprocess_data(df, column_mapping)
-    standardized_data = translate_to_common_schema(df, column_mapping)
-
-    variations = column_mapping["type_name"]
-
-    if "type_name" not in standardized_data.columns or standardized_data["type_name"].isnull().all():
+def check_for_missing_type_name(df: pd.DataFrame):
+    if "type_name" not in df.columns or df["type_name"].isnull().all():
         print("The 'type_name' column is missing or all its values are None.")
-        named_data = insert_pd_type_names(standardized_data)
+        named_data = insert_pd_type_names(df)
+    else:
+        named_data = df
 
-    pd.set_option('display.max_columns', None)
-    try:
-        print(named_data.head())
-    except:
-        print("error")
-        #
-    #
-    # data_maps_instances = create_datamaps_instances(standardized_data)
-    #
-    # for instance in data_maps_instances:
-    #     print(instance.type_id)
+    return named_data
+
+
+if __name__ == "__main__":
+    pass

@@ -7,17 +7,17 @@ from typing import Any
 
 import pandas as pd
 import requests
-from pandas.core.interchange.dataframe_protocol import DataFrame
+from pandas import DataFrame
 from requests import ReadTimeout
 
-import doctrine_monitor
 import google_sheet_updater
 from ESI_OAUTH_FLOW import get_token
-from doctrine_monitor import get_doctrine_status_optimized
 from file_cleanup import rename_move_and_archive_csv
 from get_jita_prices import get_jita_prices
 from logging_tool import configure_logging
-from sql_handler import process_esi_market_order_optimized, read_sql_watchlist, read_history, update_stats
+from shared_utils import fill_missing_stats_v2, get_doctrine_status_optimized
+from sql_handler import process_esi_market_order_optimized, read_sql_watchlist, read_history, update_stats, \
+    update_doctrine_stats
 
 # GNU General Public License
 #
@@ -345,9 +345,9 @@ def history_merge(history_data: pd.DataFrame) -> pd.DataFrame:
 
 def update_doctrine_status(target: int = 20):
     logger.info("checking doctrines | update_doctrine_status()")
-    target_df = get_doctrine_status_optimized(target=target)
+    target_df = get_doctrine_status_optimized(watchlist, target=target)
     status = google_sheet_updater.google_sheet_updater_doctrine_items(target_df)
-    doc_db_update = doctrine_monitor.update_doctrine_stats()
+    doc_db_update = update_doctrine_stats()
     print(target_df.dtypes)
     logger.info(f'update_doctrine_status() {status}')
     logger.info(f'doc_db_update {doc_db_update} items updated')
@@ -384,6 +384,7 @@ def save_data(history: DataFrame, vale_jita: DataFrame, final_data: DataFrame, f
 
     final_data['timestamp'] = update_time
 
+
     logger.info(print('saving market stats to database'))
     status = update_stats(final_data)
     logger.info(status)
@@ -392,11 +393,13 @@ def save_data(history: DataFrame, vale_jita: DataFrame, final_data: DataFrame, f
             f"saving market stats to google sheet. update time: {update_time}"
         ))
 
+    final_data = fill_missing_stats_v2(final_data, watchlist)
+
     logger.info("saving market stats to csv")
     final_data.to_csv(market_stats_filename, index=False)
 
     logger.info('updating doctrine status csv')
-    df = get_doctrine_status_optimized()
+    df = get_doctrine_status_optimized(watchlist)
     df.to_csv("output/latest/doctrines_on_market.csv", index=False)
 
     logger.info('updating google sheet')
