@@ -6,6 +6,7 @@ import pandas as pd
 from sqlalchemy import (create_engine, text)
 from sqlalchemy.orm import declarative_base
 
+from data_mapping import remap_reversable, reverse_remap
 from shared_utils import read_doctrine_watchlist, get_doctrine_status_optimized
 
 sql_logger = logging.getLogger('mkt_structures.sql_handler')
@@ -292,7 +293,6 @@ def read_sql_watchlist() -> pd.DataFrame:
         sql_logger.info("missing items found, merging doctrine_ids into watchlist")
         df = pd.concat([df, missing])
         df.reset_index(inplace=True, drop=True)
-    df.drop(columns=['categoryID_2', 'metaGroupID_2'], inplace=True)
 
     return df
 
@@ -323,6 +323,41 @@ def update_doctrine_stats():
     with engine.connect() as conn:
         status = df.to_sql('Doctrines', conn, if_exists='replace', index=False)
     print(f'database update completed for {status} doctrine items')
+
+
+def add_fit_to_watchlist(fit) -> None:
+    df = read_sql_watchlist()
+    missing = fit[~fit['type_id'].isin(df['type_id'])]
+
+    df2, reverse_map = remap_reversable(df)
+
+    miss_col = missing.columns.tolist()
+    df2_col = df2.columns.tolist()
+    miss_drop = []
+
+    for col in miss_col:
+        if col not in df2_col:
+            miss_drop.append(col)
+
+    missing.drop(columns=miss_drop, inplace=True)
+
+    df2 = pd.concat([df2, missing])
+
+    df3 = reverse_remap(df2, reverse_map)
+
+    print(df3.head())
+    print(f'{len(df)}->{len(df3)}')
+
+    check_db_ready = input('ready to update? (y/n) ')
+
+    if check_db_ready == 'y':
+        engine = create_engine(mkt_sqlfile)
+        with engine.connect() as conn:
+            df2.to_sql('watchlist_mkt', conn, if_exists='replace', index=False)
+        print(f'database update completed for {len(missing)} missing items')
+    else:
+        print("exiting without updating database")
+        return None
 
 if __name__ == "__main__":
     pass

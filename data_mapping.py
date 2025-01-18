@@ -3,7 +3,6 @@ import logging
 import pandas as pd
 
 from models import DataMaps
-from sql_handler import insert_pd_type_names
 
 # Example mapping
 column_mapping = {
@@ -14,10 +13,10 @@ column_mapping = {
     "price": ["price", "4H price", "price_5th_percentile"],
     "avg_price": ["avg_price", "avg_of_avg_price", 'avg price'],
     "avg_volume": ["avg_volume", "avg daily volume", "avg_daily_volume", 'avg vol'],
-    "group": ["group", "group_name"],
-    "group_id": ["group_id", "grp id"],
-    "category": ["category", "category_name"],
-    "category_id": ["category_id", "cat id"],
+    "group": ["group", "group_name", 'groupName'],
+    "group_id": ["group_id", "grp id", 'groupID'],
+    "category": ["category", "category_name", "categoryName"],
+    "category_id": ["category_id", "cat id", "categoryID", "cat_id"],
     "days": ["days", "days_remaining"],
     "timestamp": ["timestamp", "issued"],
     "fits": ["fits", "qty_on_market"],
@@ -27,7 +26,10 @@ column_mapping = {
     "doctrine_id": ["doctrine_id", "doc id"],
     "ship": ["ship", "ship_name", "ship name"],
     "ship_id": ["ship_id", "hull_id", "hull id", "ship id"],
-    "qty": ["qty", "quantity", "qty_required"]
+    "qty": ["qty", "quantity", "qty_required"],
+    "metagroup_id": ["metagroup_id", "metaGroupID"],
+    "meta_name": ["meta_name", "metaGroupName"]
+
 
 }
 
@@ -73,18 +75,21 @@ def preprocess_data(df: pd.DataFrame, mapping=None) -> pd.DataFrame:
 
     # Translate columns to common schema
     rename_map = {}
+    reverse_map = {}
     for standard_col, variations in mapping.items():
         for col in variations:
             if col in df.columns:
                 logging.info(f'renaming {col} to {standard_col}')
                 rename_map[col] = standard_col
+                reverse_map[standard_col] = col
+                print(f'renamed {col} to {standard_col}')
                 break
     df = df.rename(columns=rename_map)
     return df
 
 
 # Function to translate data
-def translate_to_common_schema(df: pd.DataFrame, mapping=None) -> pd.DataFrame:
+def translate_to_common_schema(df: pd.DataFrame, mapping=None) -> pd.DataFrame | dict:
     if mapping is None:
         mapping = column_mapping
     rename_map = {}
@@ -94,6 +99,7 @@ def translate_to_common_schema(df: pd.DataFrame, mapping=None) -> pd.DataFrame:
                 rename_map[col] = standard_col
                 break
     df = df.rename(columns=rename_map)
+
     return df
 
 
@@ -109,15 +115,35 @@ def create_datamaps_instances(df: pd.DataFrame) -> list:
     return [DataMaps(**row.to_dict()) for _, row in df.iterrows()]
 
 
-def check_for_missing_type_name(df: pd.DataFrame):
-    if "type_name" not in df.columns or df["type_name"].isnull().all():
-        print("The 'type_name' column is missing or all its values are None.")
-        named_data = insert_pd_type_names(df)
-    else:
-        named_data = df
+def map_data(df: pd.DataFrame) -> pd.DataFrame:
+    df = preprocess_data(df)
+    df = translate_to_common_schema(df)
+    return df
 
-    return named_data
 
+def remap_reversable(df: pd.DataFrame) -> pd.DataFrame | dict:
+    nonstandard_values = []
+    rename_mappings = {}
+    reverse_mappings = {}
+
+    for col in df.columns:
+        if col not in column_mapping.keys():
+            nonstandard_values.append(col)
+
+    for col in nonstandard_values:
+        for key, value in column_mapping.items():
+            if col in value:
+                rename_mappings[col] = key
+                reverse_mappings[key] = col
+    for key, value in rename_mappings.items():
+        print(f'renamed {key} to {value}')
+    df = df.rename(columns=rename_mappings)
+    return df, reverse_mappings
+
+
+def reverse_remap(df: pd.DataFrame, reverse_mappings: dict) -> pd.DataFrame:
+    df = df.rename(columns=reverse_mappings)
+    return df
 
 if __name__ == "__main__":
     pass
