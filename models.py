@@ -136,5 +136,16 @@ class DataMaps(Base):
     timestamp: Mapped[datetime] = mapped_column(DateTime)
 
 
+class JoinedInvTypes(Base):
+    __tablename__ = "JoinedInvTypes"
+    typeId: Mapped[int] = mapped_column(Integer, primary_key=True)
+    groupID: Mapped[int] = mapped_column(Integer)
+    typeName: Mapped[str] = mapped_column(String(100))
+    groupName: Mapped[Optional[str]] = mapped_column(String(100))
+    categoryID: Mapped[int] = mapped_column(Integer)
+    categoryName: Mapped[Optional[str]] = mapped_column(String(100))
+    metaGroupID: Mapped[int] = mapped_column(Integer)
+    metaGroupName: Mapped[Optional[str]] = mapped_column(String(100))
+
 if __name__ == '__main__':
     pass

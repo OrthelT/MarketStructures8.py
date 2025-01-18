@@ -6,7 +6,7 @@ from models import DataMaps
 
 # Example mapping
 column_mapping = {
-    "type_id": ["type_id", "typeID", "type id"],
+    "type_id": ["type_id", "typeID", "type id", "typeId"],
     "type_name": ["type_name", "typeName", "item"],
     "stock": ["stock", "volume_remain", "total_volume_remain", "qty on mkt"],
     "min_price": ["min_price", "min price"],
