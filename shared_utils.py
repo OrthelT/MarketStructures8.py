@@ -14,7 +14,7 @@ fit_mysqldb = "mysql+pymysql://Orthel:Dawson007!27608@localhost:3306/wc_fitting"
 def get_doctrine_status_optimized(watchlist, target: int = 20) -> pd.DataFrame:
     fits_df = get_doctrine_fits(db_name='wc_fitting')
     fit_ids = fits_df['id'].tolist()
-    target_items = get_fit_items(fits_df, fit_ids)
+    target_items = get_fit_items(fits_df)
 
     engine = create_engine(mkt_sqldb, echo=False)
     with engine.connect() as conn:

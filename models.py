@@ -7,7 +7,7 @@ from sqlalchemy import (
     Float,
     DateTime,
     Boolean,
-    PrimaryKeyConstraint, )
+    PrimaryKeyConstraint, BigInteger, )
 from sqlalchemy.orm import declarative_base, mapped_column, Mapped, DeclarativeBase
 
 mkt_sqlfile = "sqlite:///market_orders.sqlite"
@@ -146,6 +146,16 @@ class JoinedInvTypes(Base):
     categoryName: Mapped[Optional[str]] = mapped_column(String(100))
     metaGroupID: Mapped[int] = mapped_column(Integer)
     metaGroupName: Mapped[Optional[str]] = mapped_column(String(100))
+
+
+class Fittings_FittingItem(Base):
+    __tablename__ = "fittings_fittingitem"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    flag: Mapped[str] = mapped_column(String(25))
+    quantity: Mapped[int] = mapped_column(Integer)
+    type_id: Mapped[int] = mapped_column(Integer)
+    fit_id: Mapped[int] = mapped_column(Integer)
+    type_fk_id: Mapped[int] = mapped_column(BigInteger)
 
 if __name__ == '__main__':
     pass

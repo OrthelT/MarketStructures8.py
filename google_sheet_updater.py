@@ -91,6 +91,7 @@ def google_sheet_updater_doctrine_items(df: pd.DataFrame) -> str:
         raise
     return message
 
+
 def fill_na(df: pd.DataFrame) -> pd.DataFrame:
     # cleaning routine to keep Google Sheet API for getting grumpy about null values
     for col in df.columns:
@@ -101,6 +102,7 @@ def fill_na(df: pd.DataFrame) -> pd.DataFrame:
             # Replace NaN with empty string for non-numeric columns
             df[col] = df[col].fillna("").replace([float('inf'), float('-inf')], "")
     return df
+
 
 def gsheet_image_updater(df: pd.DataFrame):
     # utility function to post a table of URLs to use for icons in dashboard views

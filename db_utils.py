@@ -377,5 +377,58 @@ def plot_ship_volume(ship_group_id):
     engine.dispose()
 
 
+def get_doctrines_on_market() -> pd.DataFrame:
+    df = get_doctrine_status_optimized()
+
+    reordered_cols = ['fit id', 'type id', 'category', 'fit', 'ship', 'item', 'qty', 'stock', 'fits',
+                      'days', '4H price', 'avg vol', 'avg price', 'delta', 'doctrine', 'group', 'cat id',
+                      'grp id', 'doc id', 'ship id', 'timestamp']
+
+    cols = ['fit_id', 'type_id', 'category', 'fit', 'ship', 'item', 'qty', 'stock', 'fits', 'days', 'price_4h',
+            'avg_vol', 'avg_price', 'delta', 'doctrine', 'group', 'cat_id', 'grp_id', 'doc_id', 'ship_id', 'timestamp']
+
+    colszip = zip(reordered_cols, cols)
+    df.rename(columns=dict(colszip), inplace=True)
+
+    df2 = df[['fit_id', 'fit', 'ship', 'type_id', 'item', 'stock', 'fits', 'price_4h',
+              'avg_vol', 'avg_price', 'delta', 'timestamp', 'doctrine', 'group', 'cat_id',
+              'grp_id', 'doc_id', 'ship_id', 'timestamp']]
+
+    fit_counts = df2.groupby('type_id')['fit'].transform('count')
+    df2['fit_counts'] = fit_counts
+
+    return df2
+
+    return None
+
+
+#
+# def ps_qty():
+#     df2 = df[df['flag'].apply(lambda x: search(digit_end, x) is not None)]
+#     df3 = df2.loc[9:11]
+#
+#     df4 = df3.copy()
+#     pd.set_option('display.max_columns', None)
+#
+#     df4.loc[0, 'flag'] = 'HiSlot1'
+#     df4 = df4.reset_index(drop=True)
+#     df4.drop(df4.index[3], inplace=True)
+#
+#     for i in range(4, 8):
+#         df4.loc[i] = df4.loc[0]
+#         df4.loc[i, 'flag'] = f'HiSlot{i - 2}'
+#
+#     df4[['type_id', 'quantity', 'fit_id', 'type_fk_id']] = df4[['type_id', 'quantity', 'fit_id', 'type_fk_id']].astype(
+#         int)
+#
+#     df4 = df4[df4.type_id == 14278]
+#     df4 = df4.reset_index(drop=True)
+#
+#     df.drop(index=9, inplace=True)
+#     df.reset_index(drop=True, inplace=True)
+#
+#     df5 = pd.concat([df, df4]).reset_index(drop=True)
+#     print(df5)
+
 if __name__ == "__main__":
     pass

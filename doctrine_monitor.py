@@ -54,11 +54,12 @@ def get_doctrine_fits(db_name: str = 'wc_fitting') -> pd.DataFrame:
         logger.info('reading fittings_fitting and joining fittings_type')
         df = pd.read_sql_query(query3, engine)
 
-    df = df[~df['name'].str.startswith("zz ")].reset_index()
+    df = df[~df['name'].str.startswith("zz ")].reset_index(drop=True)
 
     return df
 
-def get_fit_items(df: pd.DataFrame, id_list: list):
+
+def get_fit_items(df: pd.DataFrame):
     cols = ['id', 'name', 'ship_type_id', 'type_name']
     df = df.rename({'id': 'fit_id', 'name': 'doctrine_name'}, axis="columns")
 
@@ -72,6 +73,10 @@ def get_fit_items(df: pd.DataFrame, id_list: list):
         df2 = pd.read_sql_query(query, conn)
 
     df3 = df.merge(df2, on='fit_id', how='left')
+    df3 = df3.reset_index(drop=True)
+    print("check 1: fit_id = 492")
+    print(df3[df3.fit_id == 492])
+
     grouped_df = df3.groupby(['fit_id', 'type_id', 'doctrine_name', 'type_name', 'ship_type_id'])[
         'quantity'].sum().reset_index()
 
@@ -102,32 +107,13 @@ def get_fit_items(df: pd.DataFrame, id_list: list):
 
     df4 = updated_df.merge(fit_names, on='type_id', how='left')
     fit_items = df4[['type_id', 'type_name', 'quantity', 'doctrine_name', 'ship_type_name', 'ship_type_id', 'fit_id', ]]
+    fit_items.type_id = fit_items.type_id.astype(int)
     return fit_items
 
 
-# def get_doctrines_on_market() -> pd.DataFrame:
-#     df = get_doctrine_status_optimized()
-#
-#     reordered_cols = ['fit id', 'type id', 'category', 'fit', 'ship', 'item', 'qty', 'stock', 'fits',
-#                       'days', '4H price', 'avg vol', 'avg price', 'delta', 'doctrine', 'group', 'cat id',
-#                       'grp id', 'doc id', 'ship id', 'timestamp']
-#
-#     cols = ['fit_id', 'type_id', 'category', 'fit', 'ship', 'item', 'qty', 'stock', 'fits', 'days', 'price_4h',
-#             'avg_vol', 'avg_price', 'delta', 'doctrine', 'group', 'cat_id', 'grp_id', 'doc_id', 'ship_id', 'timestamp']
-#
-#     colszip = zip(reordered_cols, cols)
-#     df.rename(columns=dict(colszip), inplace=True)
-#
-#     df2 = df[['fit_id', 'fit', 'ship', 'type_id', 'item', 'stock', 'fits', 'price_4h',
-#               'avg_vol', 'avg_price', 'delta', 'timestamp', 'doctrine', 'group', 'cat_id',
-#               'grp_id', 'doc_id', 'ship_id', 'timestamp']]
-#
-#     fit_counts = df2.groupby('type_id')['fit'].transform('count')
-#     df2['fit_counts'] = fit_counts
-#
-#     return df2
-#
-#     return None
+
 
 if __name__ == "__main__":
-    pass
+    df = get_doctrine_fits()
+    df = df[df.id == 492]
+    print(df)

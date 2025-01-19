@@ -3,11 +3,11 @@ from re import search
 
 import pandas as pd
 from numpy import unique
-from sqlalchemy import create_engine, text, select
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 
 from data_mapping import map_data, remap_reversable
-from models import JoinedInvTypes
+from models import JoinedInvTypes, Fittings_FittingItem as fittings_fittingitem
 
 fitting_schema = [
     "type_id", "type_name", "group", "group_id", "category", "category_id",
@@ -19,6 +19,7 @@ fits_folder = 'fits'
 moa = 'fits/[Moa,  WC-EN Shield DPS Moa v1.0].txt'
 
 cargo_regex = r'x\d+'
+digit_end = r'\d$'
 
 cargo_list = []
 
@@ -99,52 +100,40 @@ def get_names(df) -> pd.DataFrame:
     return df2
 
 
-def update_Moa():
+def update_fittings_type(df, adds: dict) -> pd.DataFrame or None:
+    df.drop(columns=['raceID', 'basePrice', 'soundID', 'portionSize'], inplace=True)
+
     fit_info = ['type_name', 'type_id', 'published', 'mass', 'capacity',
                 'description', 'volume', 'packaged_volume', 'portion_size', 'radius',
                 'graphic_id', 'icon_id', 'market_group_id', 'group_id']
 
-    stmt = text("SELECT * FROM invTypes WHERE invTypes.typeID = 623")
+    type_info = ['typeID', 'groupID', 'typeName', 'description', 'mass', 'volume',
+                 'capacity', 'portionSize', 'raceID', 'basePrice', 'published',
+                 'marketGroupID', 'iconID', 'soundID', 'graphicID']
 
-    engine = create_engine(sde_db)
-    with engine.connect() as conn:
-        df = pd.read_sql_query(stmt, conn)
+    type_to_rename = ['typeName', 'typeID', 'groupID', 'volume',
+                      'graphicID', 'iconID', 'marketGroupID']
 
-    type_cols = ['typeID', 'groupID', 'typeName', 'volume', 'portionSize', 'graphicID',
-                 'iconID', 'marketGroupID']
-
-    missing_col = ['type_id', 'group_id', 'type_name', 'packaged_volume', 'portion_size', 'graphic_id',
+    mew_name = ['type_name', 'type_id', 'group_id', 'packaged_volume', 'graphic_id',
                    'icon_id', 'market_group_id', ]
 
-    rename_cols = dict(zip(type_cols, missing_col))
+    rename_cols = dict(zip(type_to_rename, mew_name))
 
     df.rename(columns=rename_cols, inplace=True)
 
-    present = df.columns.intersection(missing_col)
-
-    miss = [col for col in fit_info if col not in present]
-
-    pres = ['type_id', 'group_id', 'type_name', 'packaged_volume', 'portion_size',
-            'market_group_id', 'icon_id', 'graphic_id']
-
-    add_cols = {'published': 1,
-                'mass': 12000000,
-                'capacity': 450,
-                'description': "The Moa was designed as an all-out combat ship, and its heavy armament allows the Moa to tackle almost anything that floats in space. In contrast to its nemesis the Thorax, the Moa is most effective at long range where its railguns can rain death upon foes.",
-                'volume': 101000,
-                'radius': 202
-                }
+    add_cols = adds
 
     for k, v in add_cols.items():
         df[k] = v
-    df.drop(columns=['raceID', 'basePrice', 'soundID'], inplace=True)
 
     engine = create_engine(fittings_db)
     with engine.connect() as conn:
         df.to_sql('fittings_type', conn, if_exists='append', index=False)
 
+    return df4
 
-def get_names_ORM(df) -> pd.DataFrame:
+
+def get_type_info_ORM(df) -> pd.DataFrame:
     df1 = map_data(df)
 
     names = df1['type_name'].unique().tolist()
@@ -155,11 +144,6 @@ def get_names_ORM(df) -> pd.DataFrame:
         types = session.query(JoinedInvTypes.typeId, JoinedInvTypes.typeName, JoinedInvTypes.groupID,
                               JoinedInvTypes.groupName).filter(JoinedInvTypes.typeName.in_(names)).all()
 
-        stmt = select(JoinedInvTypes.typeId).where(JoinedInvTypes.typeName.in_(names))
-        result = session.execute(stmt)
-
-    print(types)
-    print(type(types))
     df2 = pd.DataFrame(types)
 
     df2, reversal = remap_reversable(df2)
@@ -167,6 +151,73 @@ def get_names_ORM(df) -> pd.DataFrame:
     df3 = df.merge(df2, on='type_name', how='left')
 
     return df3
+
+
+def prepare_write_to_fitting_items(df: pd.DataFrame, fit_id: int) -> pd.DataFrame or None:
+    if 'qty' in df.columns:
+        df.rename(columns={'qty': 'quantity'}, inplace=True)
+
+    df = df[['type_id', 'quantity']]
+    type_id = df['type_id'].unique().tolist()
+
+    engine = create_engine(fittings_db)
+    Session = sessionmaker(bind=engine)
+
+    with Session() as session:
+        flags = session.query(fittings_fittingitem.flag,
+                              fittings_fittingitem.type_id,
+                              fittings_fittingitem.type_fk_id).filter(
+            fittings_fittingitem.type_id.in_(type_id))
+    session.close()
+    df2 = pd.DataFrame(flags)
+    df2.drop_duplicates(subset=['type_id'], inplace=True)
+    df2 = df2.reset_index(drop=True)
+
+    df3 = pd.merge(df, df2, on='type_id', how='left')
+    df3['fit_id'] = fit_id
+
+    df3.to_csv(f'data/{fit_id}_fittings_fittingitem.csv', index=False)
+
+    return df3
+
+
+def parse_quantities(df: pd.DataFrame) -> pd.DataFrame:
+    df2 = df[df['flag'].apply(lambda x: search(digit_end, x) is not None)]
+
+    df2 = df2.reset_index(drop=True)
+    df2 = df2[df2.quantity > 1]
+    df2['flag'] = df2['flag'].str[:-1]
+    qty = {}
+    flg = {}
+
+    for i, row in df2.iterrows():
+        qty.update({row['type_id']: row['quantity']})
+        flg.update({row['type_id']: row['flag']})
+
+    drops = df[df.type_id.isin(qty.keys())]
+    df.drop(index=drops.index, inplace=True)
+    df = df.reset_index(drop=True)
+    (df)
+
+    df3 = pd.DataFrame()
+    for k, v in qty.items():
+        for i in range(0, v):
+            df3.loc[i, 'type_id'] = int(k)
+            df3.loc[i, 'quantity'] = int(1)
+            df3.loc[i, 'flag'] = str(flg[k]) + str(i + 1)
+            df3.loc[i, 'fit_id'] = int(492)
+            df3.loc[i, 'type_fk_id'] = int(k)
+        df = pd.concat([df, df3]).reset_index(drop=True)
+
+    df[['type_id', 'quantity', 'fit_id', 'type_fk_id']] = df[['type_id', 'quantity', 'fit_id', 'type_fk_id']].astype(
+        int)
+
+    engine = create_engine(fittings_db)
+    with engine.connect() as conn:
+        df.to_sql('fittings_fittingitem', conn, if_exists='append', index=False)
+
+    return df
+
 
 if __name__ == '__main__':
     pass
