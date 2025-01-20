@@ -114,6 +114,4 @@ def get_fit_items(df: pd.DataFrame):
 
 
 if __name__ == "__main__":
-    df = get_doctrine_fits()
-    df = df[df.id == 492]
-    print(df)
+    pass

@@ -37,7 +37,7 @@ def parse_cargo(item) -> dict or None:
         return None
 
 
-def parse_fit(text_file) -> pd.DataFrame or None:
+def parse_fit(text_file, totals=False) -> pd.DataFrame or None:
     with open(text_file, 'r') as f:
         data = f.read()
     items = clean_items(data)
@@ -58,14 +58,19 @@ def parse_fit(text_file) -> pd.DataFrame or None:
         else:
             modules.append(item)
 
-    unique_modules = unique(modules)
+    if totals:
+        unique_modules = unique(modules)
 
-    for module in unique_modules:
-        module_item = {'type_name': module, 'qty': modules.count(module), 'fit_name': name}
+        for module in unique_modules:
+            module_item = {'type_name': module, 'qty': modules.count(module), 'fit_name': name}
+            module_list.append(module_item)
+
+    for module in modules:
+        module_item = {'type_name': module, 'qty': 1, 'fit_name': name}
         module_list.append(module_item)
 
-    fittings.extend(cargo_list)
     fittings.extend(module_list)
+    fittings.extend(cargo_list)
 
     df = pd.DataFrame(fittings, columns=['type_name', 'qty', 'fit_name'])
 
@@ -149,6 +154,7 @@ def get_type_info_ORM(df) -> pd.DataFrame:
     df2, reversal = remap_reversable(df2)
 
     df3 = df.merge(df2, on='type_name', how='left')
+    df3 = df3.reset_index(drop=True)
 
     return df3
 
@@ -174,7 +180,14 @@ def prepare_write_to_fitting_items(df: pd.DataFrame, fit_id: int) -> pd.DataFram
     df2 = df2.reset_index(drop=True)
 
     df3 = pd.merge(df, df2, on='type_id', how='left')
+    df3 = df3.reset_index(drop=True)
+
     df3['fit_id'] = fit_id
+    df3['flag'] = df3.apply(lambda row: "HighSlot0" if pd.isnull(row['flag']) else row['flag'], axis=1)
+
+    df3.type_fk_id = df3.type_fk_id.fillna(df3.type_id)
+
+
 
     df3.to_csv(f'data/{fit_id}_fittings_fittingitem.csv', index=False)
 
@@ -197,7 +210,7 @@ def parse_quantities(df: pd.DataFrame) -> pd.DataFrame:
     drops = df[df.type_id.isin(qty.keys())]
     df.drop(index=drops.index, inplace=True)
     df = df.reset_index(drop=True)
-    (df)
+
 
     df3 = pd.DataFrame()
     for k, v in qty.items():
