@@ -7,7 +7,7 @@ from sqlalchemy import (
     Float,
     DateTime,
     Boolean,
-    PrimaryKeyConstraint, )
+    PrimaryKeyConstraint, BigInteger, )
 from sqlalchemy.orm import declarative_base, mapped_column, Mapped, DeclarativeBase
 
 mkt_sqlfile = "sqlite:///market_orders.sqlite"
@@ -109,6 +109,53 @@ class Doctrines(Base):
     ship_id: Mapped[int] = mapped_column(Integer)
     timestamp: Mapped[datetime] = mapped_column(DateTime)
 
+
+class DataMaps(Base):
+    __tablename__ = "data_maps"
+    data_instance: Mapped[str] = mapped_column(String(100), primary_key=True)
+    type_id: Mapped[int] = mapped_column(Integer, nullable=True)
+    type_name: Mapped[Optional[str]] = mapped_column(String(100))
+    stock: Mapped[int] = mapped_column(Integer, nullable=True)
+    min_price: Mapped[float] = mapped_column(Float, nullable=True)
+    price: Mapped[float] = mapped_column(Float, nullable=True)
+    avg_price: Mapped[float] = mapped_column(Float, nullable=True)
+    avg_volume: Mapped[float] = mapped_column(Float, nullable=True)
+    group: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    group_id: Mapped[str] = mapped_column(String(10))
+    category: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    category_id: Mapped[str] = mapped_column(String(10))
+    days: Mapped[int] = mapped_column(Integer, nullable=True)
+    fit_id: Mapped[int] = mapped_column(Integer, nullable=True)
+    fits: Mapped[float] = mapped_column(Float, nullable=True)
+    fit: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    doctrine: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    doctrine_id: Mapped[int] = mapped_column(Integer, nullable=True)
+    ship: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    ship_id: Mapped[int] = mapped_column(Integer, nullable=True)
+    qty: Mapped[int] = mapped_column(Integer, nullable=True)
+    timestamp: Mapped[datetime] = mapped_column(DateTime)
+
+
+class JoinedInvTypes(Base):
+    __tablename__ = "JoinedInvTypes"
+    typeId: Mapped[int] = mapped_column(Integer, primary_key=True)
+    groupID: Mapped[int] = mapped_column(Integer)
+    typeName: Mapped[str] = mapped_column(String(100))
+    groupName: Mapped[Optional[str]] = mapped_column(String(100))
+    categoryID: Mapped[int] = mapped_column(Integer)
+    categoryName: Mapped[Optional[str]] = mapped_column(String(100))
+    metaGroupID: Mapped[int] = mapped_column(Integer)
+    metaGroupName: Mapped[Optional[str]] = mapped_column(String(100))
+
+
+class Fittings_FittingItem(Base):
+    __tablename__ = "fittings_fittingitem"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    flag: Mapped[str] = mapped_column(String(25))
+    quantity: Mapped[int] = mapped_column(Integer)
+    type_id: Mapped[int] = mapped_column(Integer)
+    fit_id: Mapped[int] = mapped_column(Integer)
+    type_fk_id: Mapped[int] = mapped_column(BigInteger)
 
 if __name__ == '__main__':
     pass

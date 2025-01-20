@@ -6,8 +6,8 @@ import pandas as pd
 from sqlalchemy import (create_engine, text)
 from sqlalchemy.orm import declarative_base
 
-from doctrine_monitor import read_doctrine_watchlist, get_doctrine_status_optimized
-from models import MarketStats
+from data_mapping import remap_reversable, reverse_remap
+from shared_utils import read_doctrine_watchlist, get_doctrine_status_optimized
 
 sql_logger = logging.getLogger('mkt_structures.sql_handler')
 
@@ -71,70 +71,39 @@ def insert_pd_timestamp(df: pd.DataFrame) -> pd.DataFrame:
     df2.loc[:, "timestamp"] = ts
     return df2
 
-
 def insert_pd_type_names(df: pd.DataFrame) -> pd.DataFrame:
     engine = create_engine(mkt_sqlfile, echo=False)
+    ids = df['type_id'].unique().tolist()
 
-    match_type_ids = """
-       SELECT typeID, typeName FROM JoinedInvTypes
-       """
+    # Generate named placeholders dynamically
+    placeholders = ",".join([f":id{i}" for i in range(len(ids))])
 
+    # SQL query with named placeholders
+    query = text(f"""
+        SELECT typeID, typeName 
+        FROM JoinedInvTypes
+        WHERE typeID IN ({placeholders})
+    """)
+
+    # Create a dictionary of named parameters
+    params = {f"id{i}": value for i, value in enumerate(ids)}
+
+    # Execute the query with named parameters
     with engine.connect() as conn:
-        result = conn.execute(text(match_type_ids))
-        type_mappings = result.fetchall()
+        result = conn.execute(query, params)
+        results = result.fetchall()
 
-    names = pd.DataFrame(type_mappings, columns=['type_id', 'type_name'])
+    names = pd.DataFrame(results, columns=['type_id', 'type_name'])
 
-    df2 = df.copy()
-    df2 = df2.merge(names, on='type_id', how='left')
+    print(df.head())
+    df.drop(columns=['type_name'], inplace=True, errors='ignore')
+    df2 = df.merge(names, on='type_id', how='left')
+    names = df2['type_name']
+    df2.drop(columns=['type_name'], inplace=True)
 
+    df2.insert(1, 'type_name', names)
+    print(df2.head())
     return df2
-
-
-def fill_missing_stats() -> str:
-    stats = read_sql_market_stats()
-    watchlist = read_sql_watchlist()
-
-    stats['type_id'] = stats['type_id'].astype(int)
-
-    missing = watchlist[~watchlist['type_id'].isin(stats['type_id'])]
-
-    missing_df = pd.DataFrame(
-        columns=['type_id', 'total_volume_remain', 'min_price', 'price_5th_percentile',
-                 'avg_of_avg_price', 'avg_daily_volume', 'group_id', 'type_name',
-                 'group_name', 'category_id', 'category_name', 'days_remaining', 'timestamp'])
-    missing_df = pd.concat([missing, missing_df])
-    missing_df['total_volume_remain'] = stats['total_volume_remain']
-
-    # fill historical values where available
-    hist = read_history(30)
-    hist_grouped = hist.groupby("type_id").agg({'average': 'mean', 'volume': 'mean'})
-    missing_df['avg_of_avg_price'] = missing_df['type_id'].map(hist_grouped['average'])
-    missing_df['avg_daily_volume'] = missing_df['type_id'].map(hist_grouped['volume'])
-
-    # all null values must die
-    missing_df = missing_df.infer_objects()
-    missing_df = missing_df.fillna(0)
-
-    # put timestamps back in because SQL Alchemy will very cross with us
-    # if we put zeros in the timestamp column while nuking the null values
-    # datetime values can never be 0
-    missing_df['timestamp'] = stats['timestamp']
-
-    # update the database
-    engine = create_engine(mkt_sqlfile, echo=False)
-    try:
-        with engine.connect() as conn:
-            missing_df.to_sql('Market_Stats', engine,
-                              if_exists='append',
-                              index=False,
-                              method='multi',
-                              chunksize=1000
-                              )
-        return "missing Stats loading completed successfully!"
-    except Exception as e:
-        sql_logger.error(f"Error occurred: {str(e)}")
-        raise
 
 def process_pd_dataframe(
         df: pd.DataFrame, columns: list, date_column: str = None
@@ -285,8 +254,6 @@ def update_stats(df: pd.DataFrame) -> str:
                             method='multi',
                             chunksize=1000)
         status = "Data loading completed successfully!"
-        missing_status = fill_missing_stats()
-        status = status + missing_status
         return status
     except Exception as e:
         sql_logger.error(f"Error occurred: {str(e)}")
@@ -316,13 +283,15 @@ def read_sql_watchlist() -> pd.DataFrame:
         })
     # check to make sure there are not any doctrine items not included in the
     # current watchlist
-    _, doc = read_doctrine_watchlist() or (None, None)
+    doc = read_doctrine_watchlist()
+
     missing = doc[~doc['type_id'].isin(df['type_id'])]
+
     if missing.empty:
         sql_logger.info("no missing items found, returning watchlist")
     else:
         sql_logger.info("missing items found, merging doctrine_ids into watchlist")
-        df = df.merge(missing, on='type_id', how='left')
+        df = pd.concat([df, missing])
         df.reset_index(inplace=True, drop=True)
 
     return df
@@ -333,27 +302,62 @@ def read_sql_market_stats() -> pd.DataFrame:
         df = pd.read_sql_table('Market_Stats', conn)
     return df
 
-def validate_dataframe(df: pd.DataFrame):
-    validated_data = []
-    errors = []
 
-    for index, row in df.iterrows():
-        try:
-            record = MarketStats(**row.to_dict())
-            validated_data.append(record)
-        except Exception as e:
-            errors.append((index, str(e)))
+def update_doctrine_stats():
+    watchlist = read_sql_watchlist()
+    df = get_doctrine_status_optimized(watchlist)
+    print(df.head())
+    engine = create_engine(mkt_sqlfile)
 
-    return validated_data, errors
+    reordered_cols = ['fit id', 'type id', 'category', 'fit', 'ship', 'item', 'qty', 'stock', 'fits',
+                      'days', '4H price', 'avg vol', 'avg price', 'delta', 'doctrine', 'group', 'cat id',
+                      'grp id', 'doc id', 'ship id', 'timestamp']
 
-def update_market_basket(df: pd.DataFrame) -> str:
-    sql_logger.info("Updating market basket...")
-    engine = create_engine(mkt_sqlfile, echo=True)
+    cols = ['fit_id', 'type_id', 'category', 'fit', 'ship', 'item', 'qty', 'stock', 'fits', 'days', 'price_4h',
+            'avg_vol', 'avg_price', 'delta', 'doctrine', 'group', 'cat_id', 'grp_id', 'doc_id', 'ship_id', 'timestamp']
+
+    colszip = zip(reordered_cols, cols)
+    df.rename(columns=dict(colszip), inplace=True)
+    df['timestamp'] = datetime.now(timezone.utc)
+
     with engine.connect() as conn:
-        df.to_sql('MarketBasket', con=conn, if_exists='append', index=False, chunksize=1000)
-    engine.dispose()
-    return "Market basket loading completed successfully!"
+        status = df.to_sql('Doctrines', conn, if_exists='replace', index=False)
+    print(f'database update completed for {status} doctrine items')
+
+
+def add_fit_to_watchlist(fit) -> None:
+    df = read_sql_watchlist()
+    missing = fit[~fit['type_id'].isin(df['type_id'])]
+
+    df2, reverse_map = remap_reversable(df)
+
+    miss_col = missing.columns.tolist()
+    df2_col = df2.columns.tolist()
+    miss_drop = []
+
+    for col in miss_col:
+        if col not in df2_col:
+            miss_drop.append(col)
+
+    missing.drop(columns=miss_drop, inplace=True)
+
+    df2 = pd.concat([df2, missing])
+
+    df3 = reverse_remap(df2, reverse_map)
+
+    print(df3.head())
+    print(f'{len(df)}->{len(df3)}')
+
+    check_db_ready = input('ready to update? (y/n) ')
+
+    if check_db_ready == 'y':
+        engine = create_engine(mkt_sqlfile)
+        with engine.connect() as conn:
+            df2.to_sql('watchlist_mkt', conn, if_exists='replace', index=False)
+        print(f'database update completed for {len(missing)} missing items')
+    else:
+        print("exiting without updating database")
+        return None
 
 if __name__ == "__main__":
-    df = get_doctrine_status_optimized(20)
-    print(df.dtypes)
+    pass
