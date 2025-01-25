@@ -1,4 +1,5 @@
-import json
+import logging
+import argparse
 import logging
 import os
 import time
@@ -17,7 +18,7 @@ from get_jita_prices import get_jita_prices
 from logging_tool import configure_logging
 from shared_utils import fill_missing_stats_v2, get_doctrine_status_optimized
 from sql_handler import process_esi_market_order_optimized, read_sql_watchlist, read_history, update_stats, \
-    update_doctrine_stats
+    update_doctrine_stats, market_data_to_brazil
 
 # GNU General Public License
 #
@@ -156,9 +157,6 @@ def fetch_market_orders():
         logger.error(print("{failed_pages_count} pages failed."))
     else:
         print('\nAll pages fetched successfully.')
-
-    with open('output/latest/all_orders.json', 'w') as f:
-        json.dumps(all_orders)
 
     logger.info(
         f"done. successfully retrieved {len(all_orders)}...")
@@ -387,7 +385,6 @@ def save_data(history: DataFrame, vale_jita: DataFrame, final_data: DataFrame, f
 
     final_data['timestamp'] = update_time
 
-
     logger.info(print('saving market stats to database'))
     status = update_stats(final_data)
     logger.info(status)
@@ -414,14 +411,37 @@ def save_data(history: DataFrame, vale_jita: DataFrame, final_data: DataFrame, f
     logger.info(status)
 
 
+def main() -> bool | None:
+    # Create the parser
+    parser = argparse.ArgumentParser(description="options for market ESI calls")
+
+    # Add arguments
+    parser.add_argument("--hist",
+                        action="store_true",
+                        help="Refresh history data"
+                        )
+
+    args = parser.parse_args()
+
+    if args.hist:
+        print("Running market update with full history refresh.")
+        return True
+    else:
+        print("Running market update in quick mode, saved history data will be used.")
+        return None
+
 if __name__ == "__main__":
+
     # ===============================================
     # MAIN PROGRAM
     # -----------------------------------------------
     # Main function where everything gets executed.
+    refresh_hist = main()
 
-    # Update full market history with fresh data?
-    fresh_data_choice = False
+    if refresh_hist:
+        fresh_data_choice = True
+    else:
+        fresh_data_choice = False
 
     start_time = datetime.now()
     logger.info(f"starting program: {start_time}")
@@ -431,6 +451,8 @@ if __name__ == "__main__":
     watchlist = read_sql_watchlist()
     # doctrine_watchlist, _ = read_doctrine_watchlist()
     logger.info(f"retrieved {len(watchlist)} type_ids. watchlist is:  {type(watchlist)}")
+
+    watchlist.to_csv("output/brazil/watchlist.csv", index=False)
 
     logger.info("MARKET ORDERS")
     logger.info("starting update...market orders")
@@ -448,6 +470,7 @@ if __name__ == "__main__":
     # =============================================
     historical_df, all_history = fetch_market_history(fresh_data_choice)
     # ==============================================
+
     # #save to database
 
     if fresh_data_choice:
@@ -456,12 +479,18 @@ if __name__ == "__main__":
         history_status = process_esi_market_order_optimized(all_history, True)
         logger.info(history_status)
 
-    #process market orders
+    # process market orders
     logger.info("processing orders")
     vale_jita, final_data = process_orders(market_orders, historical_df)
     # check doctrine market status
 
     save_data(historical_df, vale_jita, final_data, fresh_data_choice)
+
+    # '<><><><><>'
+    # prepare data for our experimental Turso db
+    market_data_to_brazil()
+    # '<><><><><>'
+
 
     logger.info('Checking doctrines')
     # =========================================
@@ -471,11 +500,11 @@ if __name__ == "__main__":
     finish_time = datetime.now()
     total_time = finish_time - start_time
     logger.info(f"""
-    start time: {start_time}
-    finish time: {finish_time}
-    ---------------------------
-    total time: {total_time}
-    """)
+         start time: {start_time}
+         finish time: {finish_time}
+         ---------------------------
+         total time: {total_time}
+         """)
 
     print("===================================================")
     print("ESI Request Completed Successfully.")

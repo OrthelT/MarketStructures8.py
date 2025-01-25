@@ -63,7 +63,6 @@ def get_doctrine_status_optimized(watchlist, target: int = 20) -> pd.DataFrame:
 
     return df
 
-
 def read_doctrine_watchlist() -> pd.DataFrame:
     shared_logger.info('reading doctrine watchlist')
     try:
@@ -120,7 +119,6 @@ def read_doctrine_watchlist() -> pd.DataFrame:
     df3 = df2.infer_objects()
 
     return df3
-
 
 def fill_missing_stats_v2(df: pd.DataFrame, watchlist: pd.DataFrame) -> pd.DataFrame:
     shared_logger.info('checking missing stats...starting')

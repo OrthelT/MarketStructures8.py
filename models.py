@@ -63,7 +63,6 @@ class MarketStats(Base):
     days_remaining: Mapped[int] = mapped_column(Integer, nullable=True)
     timestamp: Mapped[datetime] = mapped_column(DateTime)
 
-
 class ShipsDestroyed(Base):
     __tablename__ = "ShipsDestroyed"
     type_id: Mapped[int] = mapped_column(Integer)
@@ -74,7 +73,6 @@ class ShipsDestroyed(Base):
     killmail_id: Mapped[int] = mapped_column(Integer, primary_key=True)
     timestamp: Mapped[datetime] = mapped_column(DateTime)
 
-
 class DoctrineTargets(Base):
     __tablename__ = "DoctrinesTargets"
     fit_id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -83,7 +81,6 @@ class DoctrineTargets(Base):
     target_stock: Mapped[int] = mapped_column(Integer)
     ship_losses: Mapped[int] = mapped_column(Integer)
     adj_target: Mapped[int] = mapped_column(Integer)
-
 
 class Doctrines(Base):
     __tablename__ = "Doctrines"
@@ -108,7 +105,6 @@ class Doctrines(Base):
     doc_id: Mapped[int] = mapped_column(Integer)
     ship_id: Mapped[int] = mapped_column(Integer)
     timestamp: Mapped[datetime] = mapped_column(DateTime)
-
 
 class DataMaps(Base):
     __tablename__ = "data_maps"
@@ -135,7 +131,6 @@ class DataMaps(Base):
     qty: Mapped[int] = mapped_column(Integer, nullable=True)
     timestamp: Mapped[datetime] = mapped_column(DateTime)
 
-
 class JoinedInvTypes(Base):
     __tablename__ = "JoinedInvTypes"
     typeId: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -146,7 +141,6 @@ class JoinedInvTypes(Base):
     categoryName: Mapped[Optional[str]] = mapped_column(String(100))
     metaGroupID: Mapped[int] = mapped_column(Integer)
     metaGroupName: Mapped[Optional[str]] = mapped_column(String(100))
-
 
 class Fittings_FittingItem(Base):
     __tablename__ = "fittings_fittingitem"
