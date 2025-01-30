@@ -1,4 +1,4 @@
-import logging
+import argparse
 import argparse
 import logging
 import os
@@ -345,7 +345,6 @@ def update_doctrine_status(target: int = 20):
     logger.info("checking doctrines | update_doctrine_status()")
     target_df = get_doctrine_status_optimized(watchlist, target=target)
     target_df = target_df[~target_df['fit'].str.startswith("zz ")]
-
     target_df.to_csv("output/latest/doctrines_on_market.csv", index=False)
     status = google_sheet_updater.google_sheet_updater_doctrine_items(target_df)
     doc_db_update = update_doctrine_stats()
@@ -490,7 +489,6 @@ if __name__ == "__main__":
     # prepare data for our experimental Turso db
     market_data_to_brazil()
     # '<><><><><>'
-
 
     logger.info('Checking doctrines')
     # =========================================

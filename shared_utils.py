@@ -13,7 +13,6 @@ fit_mysqldb = "mysql+pymysql://Orthel:Dawson007!27608@localhost:3306/wc_fitting"
 
 def get_doctrine_status_optimized(watchlist, target: int = 20) -> pd.DataFrame:
     fits_df = get_doctrine_fits(db_name='wc_fitting')
-    fit_ids = fits_df['id'].tolist()
     target_items = get_fit_items(fits_df)
 
     engine = create_engine(mkt_sqldb, echo=False)
@@ -31,9 +30,11 @@ def get_doctrine_status_optimized(watchlist, target: int = 20) -> pd.DataFrame:
     target_df['delta'] = target_df['fits_on_market'] - target
 
     engine = create_engine(fit_mysqldb)
+
     with engine.connect() as conn:
         df1 = pd.read_sql_table('fittings_doctrine_fittings', conn)
         df2 = pd.read_sql_table('fittings_doctrine', conn)
+
     df1.rename(columns={'fitting_id': 'fit_id'}, inplace=True)
     df2.rename(columns={'id': 'doctrine_id'}, inplace=True)
 
@@ -88,7 +89,7 @@ def read_doctrine_watchlist() -> pd.DataFrame:
             print(f"""
             ===============
             Doctrine watchlist retrieved: {len(df)} items
-            columns: {df.columns}
+          
 
             """)
         # merge in type info for compatability with Mkt Sql file
@@ -113,12 +114,10 @@ def read_doctrine_watchlist() -> pd.DataFrame:
     type_info.drop(columns=drop_cols, inplace=True)
     type_info.rename(columns=dict(zip(old_cols, new_cols)), inplace=True)
 
-    df2 = pd.merge(df, type_info, on='type_id', how='left')
+    df2 = pd.merge(df, type_info, on='type_id', how='left').reset_index(drop=True)
+    df2.infer_objects()
 
-    df2.reset_index(drop=True, inplace=True)
-    df3 = df2.infer_objects()
-
-    return df3
+    return df2
 
 def fill_missing_stats_v2(df: pd.DataFrame, watchlist: pd.DataFrame) -> pd.DataFrame:
     shared_logger.info('checking missing stats...starting')

@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 from typing import List
 
 import pandas as pd
+from matplotlib import pyplot as plt
 from sqlalchemy import (create_engine, text)
 from sqlalchemy.orm import declarative_base
 
@@ -171,6 +172,25 @@ def read_history(doys: int = 30) -> pd.DataFrame:
     sql_logger.info(f'connection closed: {session}...returning orders from market_history table.')
 
     return historydf
+
+
+def get_item_history(item_id: int, doys: int = 30) -> pd.DataFrame:
+    engine = create_engine(mkt_sqlfile, echo=False)
+
+    # Create a session factoryf
+    session = engine.connect()
+    sql_logger.info(f'connection established: {session} by sql_handler.read_history()')
+    d = f"'-{doys} days'"
+
+    stmt = f"""
+    SELECT * FROM market_history
+    WHERE date >= date('now', {d}) AND type_id = {item_id}"""
+
+    item_historydf = pd.read_sql(stmt, session)
+    session.close()
+    sql_logger.info(f'connection closed: {session}...returning orders from market_history table.')
+
+    return item_historydf
 
 def update_history(df: pd.DataFrame) -> str:
     engine = create_engine(mkt_sqlfile, echo=False)
@@ -396,14 +416,16 @@ def market_data_to_brazil():
 
 def brazil_history() -> None:
     df = read_history()
-    df.date = pd.to_datetime(df.date)
+    df.date = pd.to_datetime(df.date).dt.date
     df = df.drop(columns=['timestamp'])
+
     ids = df.type_id
     df = df.drop(columns=['type_id'])
     df.insert(1, "type_id", ids.astype(int))
 
     df = df.sort_values(by=['date'], ascending=False)
     df = df.reset_index(drop=True)
+    df['average'] = df['average'].round(1)
 
     brazil_logger.info(f'processed {len(df)} lines of history data')
     df.to_csv('output/brazil/new_history.csv')
@@ -411,6 +433,27 @@ def brazil_history() -> None:
     brazil_logger.info('saved history data to csv and json')
 
     return None
+
+
+def plot_item_history(item_id: int, days: int = 30):
+    df = get_item_history(item_id=item_id, doys=days)
+    df.date = pd.to_datetime(df.date, utc=True)
+    print(df.dtypes)
+    title = df.type_name.unique()[0]
+    df2 = df[['date', 'average', 'volume']]
+    df2.plot(
+        x='date',
+        y=['average', 'volume'],
+        subplots=True,
+        sharex=True,
+        kind='line',
+        secondary_y='volume',
+        style=['o-', 'o-'],
+        title=[f'{title} (price)', f'volume'],
+        figsize=(10, 6),
+        xlabel='Date',
+    )
+    plt.show()
 
 if __name__ == "__main__":
     pass
