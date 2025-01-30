@@ -74,8 +74,6 @@ def get_fit_items(df: pd.DataFrame):
 
     df3 = df.merge(df2, on='fit_id', how='left')
     df3 = df3.reset_index(drop=True)
-    print("check 1: fit_id = 492")
-    print(df3[df3.fit_id == 492])
 
     grouped_df = df3.groupby(['fit_id', 'type_id', 'doctrine_name', 'type_name', 'ship_type_id'])[
         'quantity'].sum().reset_index()

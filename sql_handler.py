@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 from typing import List
 
 import pandas as pd
+from matplotlib import pyplot as plt
 from sqlalchemy import (create_engine, text)
 from sqlalchemy.orm import declarative_base
 
@@ -10,6 +11,7 @@ from data_mapping import remap_reversable, reverse_remap
 from shared_utils import read_doctrine_watchlist, get_doctrine_status_optimized
 
 sql_logger = logging.getLogger('mkt_structures.sql_handler')
+brazil_logger = logging.getLogger('mkt_structures.brazil_handler')
 
 sql_file = "market_orders.sqlite"
 mkt_sqlfile = "sqlite:///market_orders.sqlite"
@@ -95,7 +97,6 @@ def insert_pd_type_names(df: pd.DataFrame) -> pd.DataFrame:
 
     names = pd.DataFrame(results, columns=['type_id', 'type_name'])
 
-    print(df.head())
     df.drop(columns=['type_name'], inplace=True, errors='ignore')
     df2 = df.merge(names, on='type_id', how='left')
     names = df2['type_name']
@@ -135,7 +136,6 @@ def process_esi_market_order_optimized(data: List[dict], is_history: bool = Fals
     df = pd.DataFrame(data)
     # Database setup
     if is_history:
-
         try:
             status = update_history(df)
             # Bulk insert using Pandas
@@ -170,7 +170,27 @@ def read_history(doys: int = 30) -> pd.DataFrame:
     historydf = pd.read_sql(stmt, session)
     session.close()
     sql_logger.info(f'connection closed: {session}...returning orders from market_history table.')
+
     return historydf
+
+
+def get_item_history(item_id: int, doys: int = 30) -> pd.DataFrame:
+    engine = create_engine(mkt_sqlfile, echo=False)
+
+    # Create a session factoryf
+    session = engine.connect()
+    sql_logger.info(f'connection established: {session} by sql_handler.read_history()')
+    d = f"'-{doys} days'"
+
+    stmt = f"""
+    SELECT * FROM market_history
+    WHERE date >= date('now', {d}) AND type_id = {item_id}"""
+
+    item_historydf = pd.read_sql(stmt, session)
+    session.close()
+    sql_logger.info(f'connection closed: {session}...returning orders from market_history table.')
+
+    return item_historydf
 
 def update_history(df: pd.DataFrame) -> str:
     engine = create_engine(mkt_sqlfile, echo=False)
@@ -293,7 +313,7 @@ def read_sql_watchlist() -> pd.DataFrame:
         sql_logger.info("missing items found, merging doctrine_ids into watchlist")
         df = pd.concat([df, missing])
         df.reset_index(inplace=True, drop=True)
-
+    print(f'missing items = {len(missing)}, {missing.type_id.unique().tolist()}')
     return df
 
 def read_sql_market_stats() -> pd.DataFrame:
@@ -303,10 +323,16 @@ def read_sql_market_stats() -> pd.DataFrame:
     return df
 
 
+def read_sql_mkt_orders() -> pd.DataFrame:
+    engine = create_engine(mkt_sqlfile, echo=False)
+    with engine.connect() as conn:
+        df = pd.read_sql_table('market_order', conn)
+    return df
+
 def update_doctrine_stats():
     watchlist = read_sql_watchlist()
     df = get_doctrine_status_optimized(watchlist)
-    print(df.head())
+
     engine = create_engine(mkt_sqlfile)
 
     reordered_cols = ['fit id', 'type id', 'category', 'fit', 'ship', 'item', 'qty', 'stock', 'fits',
@@ -323,7 +349,6 @@ def update_doctrine_stats():
     with engine.connect() as conn:
         status = df.to_sql('Doctrines', conn, if_exists='replace', index=False)
     print(f'database update completed for {status} doctrine items')
-
 
 def add_fit_to_watchlist(fit) -> None:
     df = read_sql_watchlist()
@@ -358,6 +383,77 @@ def add_fit_to_watchlist(fit) -> None:
     else:
         print("exiting without updating database")
         return None
+
+
+def market_data_to_brazil():
+    stats = read_sql_market_stats()
+    stats.rename(columns={'timestamp': 'last_update'}, inplace=True)
+
+    renaming_dict = {
+        'price_5th_percentile': 'price',
+        'avg_of_avg_price': 'avg_price',
+        'avg_daily_volume': 'avg_vol'
+    }
+    stats.rename(columns=renaming_dict, inplace=True)
+    brazil_logger.info(f'STATS PROCESSED: {len(stats)}')
+
+    orders = read_sql_mkt_orders()
+    orders = orders.drop(columns=['timestamp'])
+    brazil_logger.info(f'ORDERS PROCESSED: {len(stats)}')
+
+    orders.to_csv('output/brazil/new_orders.csv')
+    orders.to_json('output/brazil/new_orders.json')
+    brazil_logger.info('orders updated')
+
+    stats.to_csv('output/brazil/new_stats.csv')
+    stats.to_json('output/brazil/new_stats.json')
+    brazil_logger.info('stats updated')
+
+    brazil_history()
+
+    return None
+
+
+def brazil_history() -> None:
+    df = read_history()
+    df.date = pd.to_datetime(df.date).dt.date
+    df = df.drop(columns=['timestamp'])
+
+    ids = df.type_id
+    df = df.drop(columns=['type_id'])
+    df.insert(1, "type_id", ids.astype(int))
+
+    df = df.sort_values(by=['date'], ascending=False)
+    df = df.reset_index(drop=True)
+    df['average'] = df['average'].round(1)
+
+    brazil_logger.info(f'processed {len(df)} lines of history data')
+    df.to_csv('output/brazil/new_history.csv')
+    df.to_json('output/brazil/new_history.json')
+    brazil_logger.info('saved history data to csv and json')
+
+    return None
+
+
+def plot_item_history(item_id: int, days: int = 30):
+    df = get_item_history(item_id=item_id, doys=days)
+    df.date = pd.to_datetime(df.date, utc=True)
+    print(df.dtypes)
+    title = df.type_name.unique()[0]
+    df2 = df[['date', 'average', 'volume']]
+    df2.plot(
+        x='date',
+        y=['average', 'volume'],
+        subplots=True,
+        sharex=True,
+        kind='line',
+        secondary_y='volume',
+        style=['o-', 'o-'],
+        title=[f'{title} (price)', f'volume'],
+        figsize=(10, 6),
+        xlabel='Date',
+    )
+    plt.show()
 
 if __name__ == "__main__":
     pass

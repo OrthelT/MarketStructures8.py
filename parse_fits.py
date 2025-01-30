@@ -138,22 +138,37 @@ def update_fittings_type(df, adds: dict) -> pd.DataFrame or None:
     return df4
 
 
-def get_type_info_ORM(df) -> pd.DataFrame:
+def get_type_info_ORM(df, by_id: bool = False) -> pd.DataFrame:
+
     df1 = map_data(df)
 
-    names = df1['type_name'].unique().tolist()
     engine = create_engine(mkt_db)
     Session = sessionmaker(bind=engine)
 
     with Session() as session:
-        types = session.query(JoinedInvTypes.typeId, JoinedInvTypes.typeName, JoinedInvTypes.groupID,
-                              JoinedInvTypes.groupName).filter(JoinedInvTypes.typeName.in_(names)).all()
+        if by_id:
+            ids = df1['type_id'].unique().tolist()
+            id_types = session.query(JoinedInvTypes.typeId, JoinedInvTypes.typeName, JoinedInvTypes.groupID,
+                                     JoinedInvTypes.groupName).filter(JoinedInvTypes.typeId.in_(ids)).all()
+            join_value = 'type_id'
+            df_const = id_types
+            drop_list = [
+                'type_name', 'group_id', 'group_name'
+            ]
+        else:
+            names = df1['type_name'].unique().tolist()
+            name_types = session.query(JoinedInvTypes.typeId, JoinedInvTypes.typeName, JoinedInvTypes.groupID,
+                                       JoinedInvTypes.groupName).filter(JoinedInvTypes.typeName.in_(names)).all()
+            join_value = 'type_name'
+            df_const = name_types
+            drop_list = [
+                'type_id', 'group_id. group_name'
+            ]
 
-    df2 = pd.DataFrame(types)
-
+    df2 = pd.DataFrame(df_const)
+    df.drop(columns=drop_list, inplace=True)
     df2, reversal = remap_reversable(df2)
-
-    df3 = df.merge(df2, on='type_name', how='left')
+    df3 = df.merge(df2, on=join_value, how='left')
     df3 = df3.reset_index(drop=True)
 
     return df3
