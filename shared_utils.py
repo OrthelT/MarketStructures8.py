@@ -137,8 +137,7 @@ def fill_missing_stats_v2(df: pd.DataFrame, watchlist: pd.DataFrame) -> pd.DataF
                  'group_name', 'category_id', 'category_name', 'days_remaining', 'timestamp'])
     missing_df = pd.concat([missing, missing_df])
     missing_df['total_volume_remain'] = 0
-    len_missing = len(missing_df)
-    print(len_missing)
+
     # fill historical values where available
     engine = create_engine(mkt_sqldb, echo=False)
     days_hist = 30
@@ -165,15 +164,16 @@ def fill_missing_stats_v2(df: pd.DataFrame, watchlist: pd.DataFrame) -> pd.DataF
     shared_logger.info('missing stats updated')
     updated_df = pd.concat([stats, missing_df])
     updated_df = updated_df.infer_objects()
-    print(f'LENGTH: {len(updated_df)}')
 
     de_duped_df = updated_df.drop_duplicates()
-    dropped_duplicates = len(updated_df) - len(de_duped_df)
-    print(f'LENGTH: {len(de_duped_df)}')
-    print(f'DROPPED DUPLICATES: {dropped_duplicates}')
 
     return de_duped_df
 
 
 if __name__ == '__main__':
-    pass
+    engine = create_engine(mkt_sqldb, echo=False)
+    with engine.connect() as conn:
+        stats_df = pd.read_sql_table('Market_Stats', conn)
+        watchlist = pd.read_sql_table('watchlist_mkt', conn)
+
+    df = fill_missing_stats_v2(stats_df, watchlist)

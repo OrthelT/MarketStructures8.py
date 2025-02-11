@@ -247,5 +247,49 @@ def parse_quantities(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+def parse_fit_number(fit_num: int) -> pd.DataFrame:
+    engine = create_engine(fittings_db)
+    with engine.connect() as conn:
+        df = pd.read_sql_table('fittings_fittingitem', engine)
+        df = df[df.fit_id == fit_num]
+    engine.dispose()
+    df3 = df.groupby('type_id')['quantity'].sum().reset_index()
+
+    engine = create_engine(mkt_db)
+    with engine.connect() as conn:
+        df2 = pd.read_sql_table('JoinedInvTypes', conn)
+    engine.dispose()
+
+    df2 = df2[df2.typeID.isin(df3.type_id)]
+    df2.reset_index(drop=True, inplace=True)
+    df2.rename(columns={'typeName': 'type_name', 'typeID': 'type_id'}, inplace=True)
+    df2 = df2[['type_id', 'type_name']].reset_index(drop=True)
+    df4 = df3.merge(df2, on='type_id', how='left')
+    df4 = df4.reset_index(drop=True)
+
+    engine = create_engine(mkt_db)
+    with engine.connect() as conn:
+        df = pd.read_sql_table('Market_Stats', engine)
+        engine.dispose()
+    print(df.columns)
+
+    ids = df4['type_id'].unique().tolist()
+    df5 = df[df.type_id.isin(ids)]
+    df5.reset_index(drop=True, inplace=True)
+    #
+
+    df5 = df5[
+        ['type_id', 'total_volume_remain', 'price_5th_percentile', 'days_remaining', 'avg_daily_volume', 'group_name',
+         'category_name']]
+
+    rename_cols = {'total_volume_remain': 'volume', 'price_5th_percentile': 'price', 'days_remaining': 'days',
+                   'avg_daily_volume': 'avg_volume', 'group_name': 'group', 'category_name': 'category', }
+    df6 = df4.merge(df5, on='type_id', how='left')
+    df6.rename(columns=rename_cols, inplace=True)
+    df6[['volume', 'price']] = df6[['volume', 'price']].round(0).reset_index(drop=True)
+    df6['fits'] = (df6.volume / df6.quantity).round(0)
+    return df6
+
+
 if __name__ == '__main__':
     pass

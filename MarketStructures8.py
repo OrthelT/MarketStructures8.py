@@ -348,7 +348,6 @@ def update_doctrine_status(target: int = 20):
     target_df.to_csv("output/latest/doctrines_on_market.csv", index=False)
     status = google_sheet_updater.google_sheet_updater_doctrine_items(target_df)
     doc_db_update = update_doctrine_stats()
-    print(target_df.dtypes)
     logger.info(f'update_doctrine_status() {status}')
     logger.info(f'doc_db_update {doc_db_update} items updated')
     target_df.to_csv("output/latest/target_doctrines.csv", index=False)

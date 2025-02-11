@@ -4,6 +4,7 @@ from typing import List
 
 import pandas as pd
 from matplotlib import pyplot as plt
+from matplotlib.ticker import FuncFormatter
 from sqlalchemy import (create_engine, text)
 from sqlalchemy.orm import declarative_base
 
@@ -435,24 +436,70 @@ def brazil_history() -> None:
     return None
 
 
-def plot_item_history(item_id: int, days: int = 30):
+def plot_item_history(item_id: int, days: int = 60):
     df = get_item_history(item_id=item_id, doys=days)
     df.date = pd.to_datetime(df.date, utc=True)
     print(df.dtypes)
     title = df.type_name.unique()[0]
-    df2 = df[['date', 'average', 'volume']]
+    df2 = df[['date', 'volume']]
+    df2.date = df2.date.dt.date
+
     df2.plot(
         x='date',
-        y=['average', 'volume'],
-        subplots=True,
-        sharex=True,
-        kind='line',
-        secondary_y='volume',
+        y=['volume'],
+        rot=45,
+        kind='bar',
         style=['o-', 'o-'],
-        title=[f'{title} (price)', f'volume'],
-        figsize=(10, 6),
-        xlabel='Date',
+        title=f'{title} (volume)',
+        figsize=(10, 8),
+        xlabel='Date'
+
     )
+    plt.show()
+
+
+def billions_formatter(x, _):
+    return f'{x / 1e9:.1f}B'
+
+
+def plot_daily_total_ISK():
+    df = read_history()
+    ids = df.type_id.unique().tolist()
+    pd.set_option('display.max_columns', None)
+
+    engine = create_engine(mkt_sqlfile, echo=False)
+
+    with engine.connect() as conn:
+        df2 = pd.read_sql_table('JoinedInvTypes', conn)
+    df3 = df2[df2['typeID'].isin(ids)]
+    df3.reset_index(inplace=True, drop=True)
+
+    df4 = df3[['typeID', 'groupName', 'categoryName']]
+    renaming_dict = {'typeID': 'type_id', 'groupName': 'group_name', 'categoryName': 'category_name'}
+    df4.rename(columns=renaming_dict, inplace=True)
+    df = df.merge(df4, on='type_id', how='left')
+    df['daily_value'] = df['volume'] * df['average']
+    df.drop(columns=['highest', 'lowest', 'order_count', 'timestamp'], inplace=True)
+    df.date = pd.to_datetime(df.date, utc=True).dt.date
+    df7 = df.groupby(['date', 'category_name']).sum().reset_index().sort_values(by=['date'], ascending=False)
+    df7.drop(columns=['type_name', 'average', 'group_name', 'type_id'], inplace=True)
+    df8 = df7.groupby(['date']).sum().reset_index()
+    df8.drop(columns=['category_name', 'volume'], inplace=True)
+
+    title = 'Total ISK by Day'
+
+    fig, ax = plt.subplots(figsize=(10, 8))
+    df8.plot(
+        x='date',
+        y=['daily_value'],
+        rot=45,
+        kind='bar',
+        style=['o-', 'o-'],
+        title=f'{title} (ISK in Billions)',
+        xlabel='date',
+        ax=ax
+    )
+    ax.yaxis.set_major_formatter(FuncFormatter(billions_formatter))
     plt.show()
 
 if __name__ == "__main__":
