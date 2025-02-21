@@ -18,7 +18,7 @@ from get_jita_prices import get_jita_prices
 from logging_tool import configure_logging
 from shared_utils import fill_missing_stats_v2, get_doctrine_status_optimized
 from sql_handler import process_esi_market_order_optimized, read_sql_watchlist, read_history, update_stats, \
-    update_doctrine_stats, market_data_to_brazil
+    update_doctrine_stats, market_data_to_brazil, insert_pd_type_names
 
 # GNU General Public License
 #
@@ -163,9 +163,15 @@ def fetch_market_orders():
     return all_orders
 
 # update market history
-def fetch_market_history(fresh_data: bool == True) -> tuple[DataFrame, list[Any] | None]:
-    watchlist = read_sql_watchlist()
-    type_id_list = watchlist["type_id"].unique().tolist()
+def fetch_market_history(fresh_data: bool = True, id_list: list[Any] | None = None) -> tuple[
+    DataFrame, list[Any] | None]:
+    if id_list is None:
+        watchlist = read_sql_watchlist()
+        type_id_list = watchlist["type_id"].unique().tolist()
+    else:
+        type_id_list = id_list
+        watchids = pd.DataFrame(type_id_list, columns=["type_id"])
+        watchlist = insert_pd_type_names(watchids)
 
     # Create a lookup dictionary for type_names only used in status update....
     type_id_to_name_map = watchlist.set_index('type_id')['type_name'].to_dict()

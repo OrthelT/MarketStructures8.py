@@ -2,6 +2,7 @@ import logging
 
 import pandas as pd
 import sqlalchemy
+from matplotlib import pyplot as plt
 from sqlalchemy import create_engine, exc
 
 from doctrine_monitor import get_doctrine_fits, get_fit_items
@@ -9,7 +10,7 @@ from doctrine_monitor import get_doctrine_fits, get_fit_items
 shared_logger = logging.getLogger('mkt_structures.shared_utils')
 mkt_sqldb = "sqlite:///market_orders.sqlite"
 fit_mysqldb = "mysql+pymysql://Orthel:Dawson007!27608@localhost:3306/wc_fitting"
-
+mkt_sqlfile = mkt_sqldb
 
 def get_doctrine_status_optimized(watchlist, target: int = 20) -> pd.DataFrame:
     fits_df = get_doctrine_fits(db_name='wc_fitting')
@@ -61,7 +62,8 @@ def get_doctrine_status_optimized(watchlist, target: int = 20) -> pd.DataFrame:
                       'grp id', 'doc id', 'ship id', 'timestamp']
 
     df = df[reordered_cols]
-
+    df.infer_objects()
+    df.fillna(0, inplace=True)
     return df
 
 def read_doctrine_watchlist() -> pd.DataFrame:
@@ -170,10 +172,46 @@ def fill_missing_stats_v2(df: pd.DataFrame, watchlist: pd.DataFrame) -> pd.DataF
     return de_duped_df
 
 
-if __name__ == '__main__':
+def read_full_history() -> pd.DataFrame:
     engine = create_engine(mkt_sqldb, echo=False)
     with engine.connect() as conn:
-        stats_df = pd.read_sql_table('Market_Stats', conn)
-        watchlist = pd.read_sql_table('watchlist_mkt', conn)
+        df = pd.read_sql_table('full_market_history', conn)
+    return df
 
-    df = fill_missing_stats_v2(stats_df, watchlist)
+
+def load_full_history() -> None:
+    df = read_market_orders()
+    ids = df.type_id.unique().tolist()
+    pd.set_option('display.max_columns', None)
+    df2, history_dict = fetch_market_history(True, id_list=ids)
+
+    engine = create_engine(mkt_sqlfile, echo=False)
+    with engine.connect() as conn:
+        df2.to_sql('full_market_history', conn, if_exists='replace', index=False)
+    print('full history loaded')
+
+
+def get_30_days_trade_volume() -> pd.DataFrame:
+    df = read_full_history()
+    df['isk_volume'] = df['volume'] * df['average']
+    df2 = df.groupby('date').agg({'isk_volume': 'sum'}).reset_index()
+    df2['date'] = pd.to_datetime(df2['date'])
+    # df2.set_index('date', inplace=True)
+    last_thirty_days = df2.tail(30)
+    total_isk = last_thirty_days['isk_volume'].sum()
+    print(f'total isk volume: {total_isk}')
+    return last_thirty_days
+
+
+def plot_30_days_trade_volume() -> None:
+    df = get_30_days_trade_volume()
+    plt.figure(figsize=(12, 6))
+    plt.bar(df['date'], df['isk_volume'])
+    plt.title('30-day trade volume')
+    plt.xlabel('Date')
+    plt.ylabel('Total ISK volume')
+    plt.show()
+
+
+if __name__ == '__main__':
+    pass

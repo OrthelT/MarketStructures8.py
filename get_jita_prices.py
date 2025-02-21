@@ -5,6 +5,8 @@ from datetime import datetime, timedelta
 import pandas as pd
 import requests
 
+sde_db = r"sqlite:///C:/Users/User/PycharmProjects/ESI_Utilities/SDE/SDE sqlite-latest.sqlite"
+
 # Tools to retrieve Jita prices using the Fuzzworks market API
 # Sample data to use for testing
 file = 'data/mining_basket.csv'
@@ -15,7 +17,8 @@ ids = [int(x) for x in ids]
 
 logger = logging.getLogger('mkt_structures.get_jita_prices')
 
-def get_jita_prices(vale_data):
+
+def get_jita_prices(vale_data: pd.DataFrame) -> pd.DataFrame:
     logger.info('getting jita prices')
     regionid = '10000002'
     base_url = 'https://market.fuzzwork.co.uk/aggregates/?region='
@@ -129,5 +132,23 @@ def process_market_basket():
     logger.info('saved market basket data to csv and returning df_grouped')
     return df_grouped
 
+
+def get_jita_sell(item: pd.DataFrame) -> pd.DataFrame:
+    logger.info('getting jita prices')
+    regionid = '10000002'
+    base_url = 'https://market.fuzzwork.co.uk/aggregates/?region='
+    ids = item['type_id'].unique().tolist()
+    ids_str = ','.join(map(str, ids))
+    url = f'{base_url}{regionid}&types={ids_str}'
+    response = requests.get(url)
+    data = response.json()
+    logger.info('got jita prices. parsing json to df')
+    df = pd.DataFrame(parse_json(data))
+    print(df.columns)
+    logger.info('done. returning df to get_jita_sell()')
+    return df
 if __name__ == "__main__":
-    pass
+    df = pd.read_csv('output/latest/valemarketstats_latest.csv')
+    df2 = get_jita_sell(df)
+
+    print(df2.head())

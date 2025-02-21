@@ -5,7 +5,7 @@ from typing import List
 import pandas as pd
 from matplotlib import pyplot as plt
 from matplotlib.ticker import FuncFormatter
-from sqlalchemy import (create_engine, text)
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import declarative_base
 
 from data_mapping import remap_reversable, reverse_remap
@@ -346,6 +346,8 @@ def update_doctrine_stats():
     colszip = zip(reordered_cols, cols)
     df.rename(columns=dict(colszip), inplace=True)
     df['timestamp'] = datetime.now(timezone.utc)
+    df.infer_objects()
+    df.fillna(0, inplace=True)
 
     with engine.connect() as conn:
         status = df.to_sql('Doctrines', conn, if_exists='replace', index=False)
@@ -501,6 +503,53 @@ def plot_daily_total_ISK():
     )
     ax.yaxis.set_major_formatter(FuncFormatter(billions_formatter))
     plt.show()
+
+
+def market_totals() -> pd.DataFrame:
+    df = read_history(60)
+    df['total_ISK'] = df['volume'] * df['average']
+    df.drop(columns=['highest', 'lowest', 'order_count', 'timestamp'], inplace=True)
+    df.date = pd.to_datetime(df.date, utc=True).dt.date
+    df2 = df.groupby(['date']).sum().reset_index()
+    df2.drop(columns=['type_name', 'average', 'type_id'], inplace=True)
+    thirty_day_total = df2['total_ISK'].sum()
+    return df2
+
+
+def read_market_orders() -> pd.DataFrame:
+    engine = create_engine(mkt_sqlfile, echo=False)
+    with engine.connect() as conn:
+        df = pd.read_sql_table('market_order', conn)
+    return df
+
+
+def get_item_info(name) -> pd.DataFrame:
+    engine = create_engine(mkt_sqlfile, echo=False)
+    stmt = "SELECT * FROM main.Market_Stats WHERE Market_Stats.type_name LIKE :name"
+    params = {'name': f'%{name}%'}
+    engine = create_engine(mkt_sqlfile, echo=False)
+
+    with engine.connect() as conn:
+        df = pd.read_sql(stmt, conn, params=params)
+
+    print(df.columns)
+    print(df.head())
+
+    sell_formatted = "{:,.0f}".format(df.price_5th_percentile.unique()[0])
+    avg_formatted = "{:,.0f}".format(df.avg_of_avg_price.unique()[0])
+
+    print(f'''
+    type_id: {df.type_id.unique()[0]}
+    type_name: {df.type_name.unique()[0]}
+    -----------------------------
+    stock: {df.total_volume_remain.unique()[0]}
+    days_remaining: {df.days_remaining.unique()[0]}
+    avg_volume: {df.avg_daily_volume.unique()[0]}
+    sell_price: {sell_formatted}
+    avg_price: {avg_formatted}
+    -------
+    timestamp: {df.timestamp.unique()[0]}
+    ''')
 
 if __name__ == "__main__":
     pass

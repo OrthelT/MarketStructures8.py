@@ -40,7 +40,6 @@ def google_mkt_sheet_updater() -> str:
     # Clean the DataFrame to ensure JSON compliance
     df = df.infer_objects()
     df2 = fill_na(df)
-    # access credentials to update Google sheets
     # Convert DataFrame to a list of lists (Google Sheets format)
     data_list = [df2.columns.tolist()] + df2.astype(str).values.tolist()
 
