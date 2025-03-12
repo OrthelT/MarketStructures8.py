@@ -248,6 +248,22 @@ def get_doctrine_mkt_status() -> pd.DataFrame:
 
     df2 = df2[["fit_id", "type_id", "quantity"]]
 
+    fit_ids = df2['fit_id'].unique().tolist()
+    fit_ids_str = ', '.join(str(fit_id) for fit_id in fit_ids)
+
+    query1a = f"""
+     SELECT id,ship_type_id FROM fittings_fitting 
+     WHERE id IN ({fit_ids_str})
+     """
+
+    engine = create_engine(fit_mysqldb, echo=False)
+    with engine.connect() as conn:
+        df_ship_types = pd.read_sql_query(query1a, conn)
+
+    df_ship_types.rename(columns={'id': 'fit_id', 'ship_type_id': 'type_id'}, inplace=True)
+    df_ship_types["quantity"] = 1
+    df2 = pd.concat([df2, df_ship_types])
+
     df3 = df2.groupby(["fit_id", "type_id"]).sum().reset_index()
     print(f"df3.columns: {df3.columns}")
     type_ids = df3['type_id'].unique().tolist()
