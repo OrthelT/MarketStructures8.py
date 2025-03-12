@@ -16,7 +16,7 @@ fitting_schema = [
 ]
 
 fits_folder = 'fits'
-moa = 'fits/[Moa,  WC-EN Shield DPS Moa v1.0].txt'
+CFI = 'fits/[Cyclone Fleet Issue,  2502 WC-EN C.txt'
 
 cargo_regex = r'x\d+'
 digit_end = r'\d$'
@@ -27,6 +27,9 @@ fittings_db = r"mysql+pymysql://Orthel:Dawson007!27608@localhost:3306/wc_fitting
 mkt_db = "sqlite:///market_orders.sqlite"
 sde_db = r"sqlite:///C:/Users/User/PycharmProjects/ESI_Utilities/SDE/SDE sqlite-latest.sqlite"
 
+from logging import getLogger
+
+logger = getLogger('mkt_structures.parse_fits')
 
 def parse_cargo(item) -> dict or None:
     t = search(cargo_regex, item)
@@ -135,8 +138,7 @@ def update_fittings_type(df, adds: dict) -> pd.DataFrame or None:
     with engine.connect() as conn:
         df.to_sql('fittings_type', conn, if_exists='append', index=False)
 
-    return df4
-
+    print("fit_updated")
 
 def get_type_info_ORM(df, by_id: bool = False) -> pd.DataFrame:
 
@@ -288,8 +290,60 @@ def parse_fit_number(fit_num: int) -> pd.DataFrame:
     df6.rename(columns=rename_cols, inplace=True)
     df6[['volume', 'price']] = df6[['volume', 'price']].round(0).reset_index(drop=True)
     df6['fits'] = (df6.volume / df6.quantity).round(0)
-    return df6
-
+    return df
 
 if __name__ == '__main__':
-    pass
+    pd.set_option('display.max_columns', None)
+    df = parse_fit(CFI, totals=True)
+
+    df.type_name = df.type_name.apply(lambda x: x.strip())
+    df.rename(columns={'type_name': 'typeName'}, inplace=True)
+    tnames = df.typeName.unique().tolist()
+
+    params = {'TypeName': tnames}
+
+    engine = create_engine(mkt_db)
+    Session = sessionmaker(bind=engine)
+    stmt = text("""SELECT typeID,typeName FROM JoinedInvTypes
+    WHERE typeName IN :TypeName;""")
+
+    with Session() as session:
+        results = session.query(JoinedInvTypes).filter(JoinedInvTypes.typeName.in_(tnames)).all()
+
+    typeName_results = [result.typeName for result in results]
+    typeID_results = [result.typeId for result in results]
+
+    df2 = pd.DataFrame(list(zip(typeID_results, typeName_results)), columns=['typeID', 'typeName'])
+    df_merged = df.merge(df2, on='typeName', how='left')
+
+    df_merged.rename(columns={'typeName': 'type_name', 'typeID': 'type_id'}, inplace=True)
+
+    df = df_merged
+
+    ids = df.pop('type_id')
+
+    df.insert(0, 'type_id', ids)
+
+    df.qty = df.qty.apply(pd.to_numeric)
+
+    df2 = df.groupby('type_id')['qty'].sum().reset_index()
+
+    df = df.drop(columns=['qty'])
+
+    df3 = df2.merge(df, on='type_id', how='left')
+
+    df3 = df3.reset_index(drop=True)
+    df3['fit_id'] = 442
+
+    name = df3.fit_name[0]
+    print(f"orig_name = {name}")
+    name = name[1:-1]
+    nl = name.split(',')
+    snl = [x.strip() for x in nl]
+    df3 = df3.drop(columns=['fit_name'])
+    df3['fit_name'] = snl[1]
+    df3['ship'] = snl[0]
+
+    engine = create_engine(fittings_db)
+    with Session() as session:
+        session.delete(session.query(fittings_fittingitem).filter(fittings_fittingitem.fit_id == 442))

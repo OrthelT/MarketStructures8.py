@@ -18,6 +18,17 @@ ids = [int(x) for x in ids]
 logger = logging.getLogger('mkt_structures.get_jita_prices')
 
 
+def get_jita_price_data(type_ids: list) -> pd.DataFrame:
+    regionid = '10000002'
+    base_url = 'https://market.fuzzwork.co.uk/aggregates/?region='
+    ids = type_ids
+    ids_str = ','.join(map(str, ids))
+    url = f'{base_url}{regionid}&types={ids_str}'
+    response = requests.get(url)
+    data = response.json()
+    jita_prices = parse_json(data)
+    return jita_prices
+
 def get_jita_prices(vale_data: pd.DataFrame) -> pd.DataFrame:
     logger.info('getting jita prices')
     regionid = '10000002'
