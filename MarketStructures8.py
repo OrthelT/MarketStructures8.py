@@ -16,7 +16,7 @@ from ESI_OAUTH_FLOW import get_token
 from file_cleanup import rename_move_and_archive_csv
 from get_jita_prices import get_jita_prices
 from logging_tool import configure_logging
-from shared_utils import fill_missing_stats_v2, get_doctrine_status_optimized
+from shared_utils import fill_missing_stats_v2, get_doctrine_status_optimized, get_doctrine_mkt_status
 from sql_handler import process_esi_market_order_optimized, read_sql_watchlist, read_history, update_stats, \
     update_doctrine_stats, market_data_to_brazil, insert_pd_type_names
 
@@ -356,7 +356,10 @@ def update_doctrine_status(target: int = 20):
     doc_db_update = update_doctrine_stats()
     logger.info(f'update_doctrine_status() {status}')
     logger.info(f'doc_db_update {doc_db_update} items updated')
+    df_doct_mkt = get_doctrine_mkt_status()
+    df_doct_mkt.to_csv("output/latest/doctrines_market_status.csv", index=False)
     target_df.to_csv("output/latest/target_doctrines.csv", index=False)
+
     logger.info(print("Completed doctrines check | update_doctrine_status()"))
 
 def process_orders(market_orders, history_data) -> tuple[DataFrame, DataFrame]:
