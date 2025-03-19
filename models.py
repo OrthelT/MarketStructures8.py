@@ -7,14 +7,14 @@ from sqlalchemy import (
     Float,
     DateTime,
     Boolean,
-    PrimaryKeyConstraint, BigInteger, )
-from sqlalchemy.orm import declarative_base, mapped_column, Mapped, DeclarativeBase
+    PrimaryKeyConstraint, BigInteger)
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 mkt_sqlfile = "sqlite:///market_orders.sqlite"
 testdb = 'sqlite:///test.sqlite'
 fit_mysqlfile = "mysql+pymysql://Orthel:Dawson007!27608@localhost:3306/wc_fitting"
 
-Base = declarative_base()
+Base = DeclarativeBase()
 
 
 class Base(DeclarativeBase):

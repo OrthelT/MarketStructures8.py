@@ -214,8 +214,7 @@ def plot_30_days_trade_volume() -> None:
 
 
 def get_doctrine_mkt_status() -> pd.DataFrame:
-    mysql_connection = fit_mysqldb  # Assuming this variable is defined elsewhere in your code
-    # Create engine with echo=False to hide SQL output
+    mysql_connection = fit_mysqldb
     engine = sqlalchemy.create_engine(mysql_connection, echo=False)
 
     # First query: Get doctrine and fitting IDs
@@ -244,7 +243,6 @@ def get_doctrine_mkt_status() -> pd.DataFrame:
         df = pd.DataFrame()
 
     df2 = df.drop(columns=["id", "flag", "type_fk_id"])
-    print(df2.columns)
 
     df2 = df2[["fit_id", "type_id", "quantity"]]
 
@@ -275,7 +273,7 @@ def get_doctrine_mkt_status() -> pd.DataFrame:
         df_ms = pd.read_sql_query(query, conn)
 
     doctrines = df3.merge(df_ms, on='type_id', how='left')
-    pd.set_option('display.max_columns', None)
+    doctrines = get_names(doctrines)
 
     doctrines["fits"] = doctrines["total_volume_remain"] / doctrines["quantity"]
     doctrines["fits"] = doctrines["fits"].round(0)
@@ -360,6 +358,26 @@ def find_missing_ships(df):
     s_ids = [id for id in ids if id in ship_ids]
     print(s_ids)
 
+
+def get_names(df):
+    print(df["type_name"].isnull().sum())
+    df2 = df.copy()
+    df2 = df2[df2["total_volume_remain"].isnull()]
+    df2 = df2[["type_id", "type_name"]]
+    ids = df2['type_id'].unique().tolist()
+    ids_str = ', '.join(str(id) for id in ids)
+    query = f"SELECT typeID, typeName from JoinedInvTypes where typeID in ({ids_str})"
+    engine = create_engine(mkt_sqldb)
+    with engine.connect() as conn:
+        df_names = pd.read_sql_query(query.format(ids_str=ids_str), conn)
+    df_names.rename(columns={'typeID': 'type_id', 'typeName': 'type_name'}, inplace=True)
+    type_id_to_name = dict(zip(df_names['type_id'], df_names['type_name']))
+
+    # Use this mapping to fill only the null values in type_name
+    mask = df['type_name'].isnull()
+    df.loc[mask, 'type_name'] = df.loc[mask, 'type_id'].map(type_id_to_name)
+    print(df["type_name"].isnull().sum())
+    return df
 
 if __name__ == '__main__':
     pass

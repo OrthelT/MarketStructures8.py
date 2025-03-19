@@ -222,4 +222,4 @@ def agg_total_kills_by_day(df: pd.DataFrame) -> pd.DataFrame:
 
 
 if __name__ == '__main__':
-    df = aggregate_kills()
+    pass
