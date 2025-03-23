@@ -2,6 +2,7 @@ import argparse
 import argparse
 import logging
 import os
+import shutil
 import time
 from datetime import datetime
 from typing import Any
@@ -501,6 +502,9 @@ if __name__ == "__main__":
     logger.info('Checking doctrines')
     # =========================================
     update_doctrine_status()
+
+    shutil.copy('output/latest/doctrines_market_status.csv', 'output/brazil/new_doctrines.csv')
+    logger.info('Doctrines checked')
     # =========================================
     # Completed stats
     finish_time = datetime.now()

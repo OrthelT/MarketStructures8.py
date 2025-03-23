@@ -61,10 +61,11 @@ def get_doctrine_status_optimized(watchlist, target: int = 20) -> pd.DataFrame:
                       'days', '4H price', 'avg vol', 'avg price', 'delta', 'doctrine', 'group', 'cat id',
                       'grp id', 'doc id', 'ship id', 'timestamp']
 
-    df = df[reordered_cols]
-    df.infer_objects()
-    df.fillna(0, inplace=True)
-    return df
+    df2 = df[reordered_cols]
+    df2.reset_index(drop=True, inplace=True)
+    df2.infer_objects()
+    df2.fillna(0, inplace=True)
+    return df2
 
 def read_doctrine_watchlist() -> pd.DataFrame:
     shared_logger.info('reading doctrine watchlist')
@@ -348,15 +349,9 @@ def get_doctrine_mkt_status() -> pd.DataFrame:
     doctrines.avg_vol = doctrines.avg_vol.round(0)
     doctrines.days = doctrines.days.round(0)
 
+    doctrines = handle_zero_dates(doctrines)
+
     return doctrines
-
-
-def find_missing_ships(df):
-    ids = df['type_id'].unique().tolist()
-    ship_ids = df['ship_id'].unique().tolist()
-
-    s_ids = [id for id in ids if id in ship_ids]
-    print(s_ids)
 
 
 def get_names(df):
@@ -379,7 +374,6 @@ def get_names(df):
     print(df["type_name"].isnull().sum())
     return df
 
-
 def add_to_watchlist(ids: list):
     ids_str = ', '.join(str(id) for id in ids)
     query = (f"""
@@ -396,6 +390,15 @@ def add_to_watchlist(ids: list):
         print(df_names)
         df_names.to_sql('watchlist_mkt', conn, if_exists='append', index=False)
     conn.close()
+
+
+def handle_zero_dates(df: pd.DataFrame) -> pd.DataFrame:
+    df.timestamp = df.timestamp.apply(lambda x: str(x) if x == 0 else x)
+    df = df.sort_values(by='timestamp', ascending=False)
+    ts = df.timestamp[0]
+    df.timestamp = df.timestamp.apply(lambda x: ts if x == str(0) else x)
+    df.timestamp = pd.to_datetime(df.timestamp)
+    return df
 
 if __name__ == '__main__':
     pass

@@ -391,6 +391,8 @@ def add_fit_to_watchlist(fit) -> None:
 
 
 def market_data_to_brazil():
+    print('starting market_data_to_brazil')
+    print('=' * 100)
     stats = read_sql_market_stats()
     stats.rename(columns={'timestamp': 'last_update'}, inplace=True)
 
@@ -401,40 +403,34 @@ def market_data_to_brazil():
     }
     stats.rename(columns=renaming_dict, inplace=True)
     brazil_logger.info(f'STATS PROCESSED: {len(stats)}')
+    stats.avg_vol = stats.avg_vol.astype(int)
 
     orders = read_sql_mkt_orders()
     orders = orders.drop(columns=['timestamp'])
     brazil_logger.info(f'ORDERS PROCESSED: {len(stats)}')
 
-    orders.to_csv('output/brazil/new_orders.csv')
+    orders.to_csv('output/brazil/new_orders.csv', index=False)
     orders.to_json('output/brazil/new_orders.json')
     brazil_logger.info('orders updated')
 
-    stats.to_csv('output/brazil/new_stats.csv')
+    stats.to_csv('output/brazil/new_stats.csv', index=False)
     stats.to_json('output/brazil/new_stats.json')
     brazil_logger.info('stats updated')
 
-    brazil_history()
+    history_df = read_history()
+    history_df.date = pd.to_datetime(history_df.date)
+    history_df.timestamp = pd.to_datetime(history_df.timestamp)
 
-    return None
+    ids = history_df.pop('type_id')
+    history_df.insert(1, "type_id", ids.astype(int))
 
+    history_df = history_df.sort_values(by=['date'], ascending=False)
+    history_df = history_df.reset_index(drop=True)
+    history_df['average'] = history_df['average'].round(1)
 
-def brazil_history() -> None:
-    df = read_history()
-    df.date = pd.to_datetime(df.date).dt.date
-    df = df.drop(columns=['timestamp'])
-
-    ids = df.type_id
-    df = df.drop(columns=['type_id'])
-    df.insert(1, "type_id", ids.astype(int))
-
-    df = df.sort_values(by=['date'], ascending=False)
-    df = df.reset_index(drop=True)
-    df['average'] = df['average'].round(1)
-
-    brazil_logger.info(f'processed {len(df)} lines of history data')
-    df.to_csv('output/brazil/new_history.csv')
-    df.to_json('output/brazil/new_history.json')
+    brazil_logger.info(f'processed {len(history_df)} lines of history data')
+    history_df.to_csv('output/brazil/new_history.csv')
+    history_df.to_json('output/brazil/new_history.json')
     brazil_logger.info('saved history data to csv and json')
 
     return None
