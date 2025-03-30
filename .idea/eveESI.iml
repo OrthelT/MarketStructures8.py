@@ -14,6 +14,7 @@
       <excludeFolder url="file://$MODULE_DIR$/data/doctrines" />
       <excludeFolder url="file://$MODULE_DIR$/data/short_files" />
       <excludeFolder url="file://$MODULE_DIR$/tests" />
+      <excludeFolder url="file://$MODULE_DIR$/fits" />
     </content>
     <orderEntry type="jdk" jdkName="Python 3.13" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />

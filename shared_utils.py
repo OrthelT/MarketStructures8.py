@@ -64,8 +64,9 @@ def get_doctrine_status_optimized(watchlist, target: int = 20) -> pd.DataFrame:
     df2 = df[reordered_cols]
     df2.reset_index(drop=True, inplace=True)
     df2.infer_objects()
-    df2.fillna(0, inplace=True)
-    return df2
+    df3 = df2.copy()
+    df3.fillna(0, inplace=True)
+    return df3
 
 def read_doctrine_watchlist() -> pd.DataFrame:
     shared_logger.info('reading doctrine watchlist')
@@ -274,6 +275,7 @@ def get_doctrine_mkt_status() -> pd.DataFrame:
         df_ms = pd.read_sql_query(query, conn)
 
     doctrines = df3.merge(df_ms, on='type_id', how='left')
+
     doctrines = get_names(doctrines)
 
     doctrines["fits"] = doctrines["total_volume_remain"] / doctrines["quantity"]
@@ -361,17 +363,32 @@ def get_names(df):
     df2 = df2[["type_id", "type_name"]]
     ids = df2['type_id'].unique().tolist()
     ids_str = ', '.join(str(id) for id in ids)
-    query = f"SELECT typeID, typeName from JoinedInvTypes where typeID in ({ids_str})"
+    query = f"SELECT typeID, typeName, groupID, groupName, categoryID, categoryName from JoinedInvTypes where typeID in ({ids_str})"
+
     engine = create_engine(mkt_sqldb)
     with engine.connect() as conn:
         df_names = pd.read_sql_query(query.format(ids_str=ids_str), conn)
-    df_names.rename(columns={'typeID': 'type_id', 'typeName': 'type_name'}, inplace=True)
+
+    cols = ['fit_id', 'type_id', 'quantity', 'total_volume_remain', 'min_price',
+     'price_5th_percentile', 'avg_of_avg_price', 'avg_daily_volume',
+     'group_id', 'type_name', 'group_name', 'category_id', 'category_name',
+     'days_remaining', 'timestamp']
+
+    df_names.rename(columns={'typeID': 'type_id', 'typeName': 'type_name', 'groupID': 'group_id',
+                             'groupName': 'group_name', 'categoryID': 'category_id',
+                             'categoryName':'category_name'}, inplace=True)
+
     type_id_to_name = dict(zip(df_names['type_id'], df_names['type_name']))
+    type_id_to_category_name = dict(zip(df_names['type_id'], df_names['category_name']))
+    type_id_to_group_name = dict(zip(df_names['type_id'], df_names['group_name']))
 
     # Use this mapping to fill only the null values in type_name
     mask = df['type_name'].isnull()
     df.loc[mask, 'type_name'] = df.loc[mask, 'type_id'].map(type_id_to_name)
+    df.loc[mask, 'category_name'] = df.loc[mask, 'type_id'].map(type_id_to_category_name)
+    df.loc[mask, 'group_name'] = df.loc[mask, 'type_id'].map(type_id_to_group_name)
     print(df["type_name"].isnull().sum())
+    print(df[df["group_id"].isnull()])
     return df
 
 def add_to_watchlist(ids: list):
@@ -401,4 +418,5 @@ def handle_zero_dates(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 if __name__ == '__main__':
-    pass
+    df = get_doctrine_mkt_status()
+    print(df)
