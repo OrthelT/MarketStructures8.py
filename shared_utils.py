@@ -398,7 +398,7 @@ def add_to_watchlist(ids: list):
         groupName, categoryID, categoryName 
         from JoinedInvTypes where typeID in ({ids_str})
         """)
-    engine = create_engine(mkt_sqldb)
+    engine = create_engine(mkt_sqldb, echo=True)
     with engine.connect() as conn:
         df_names = pd.read_sql_query(query.format(ids_str=ids_str), conn)
         df_names.rename(columns={'typeID': 'type_id', 'groupID': 'group_id', 'typeName': 'type_name',
@@ -406,7 +406,7 @@ def add_to_watchlist(ids: list):
                                  'categoryName': 'category_name'}, inplace=True)
         print(df_names)
         df_names.to_sql('watchlist_mkt', conn, if_exists='append', index=False)
-    conn.close()
+        conn.commit()
 
 
 def handle_zero_dates(df: pd.DataFrame) -> pd.DataFrame:
@@ -418,5 +418,4 @@ def handle_zero_dates(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 if __name__ == '__main__':
-    df = get_doctrine_mkt_status()
-    print(df)
+    pass
