@@ -94,34 +94,34 @@ def get_ship_loss_stats():
     total_items = 0
     skip = 0
 
-    while kill_time > week_ago:
+    print(type(kill_time))
 
+    logger.info(f"""
+    REQUEST#: {req_num}
+    KILL TIME: {kill_time}
+    """)
+
+    req_num += 1
+    time.sleep(.1)
+
+    logger.info('starting request >> call frt_km_query()')
+    data = frt_km_query(skip=skip, date_after=week_ago_ts)
+    skip += 1000
+
+    if data:
         item_count = 0
 
-        logger.info(f"""
-        REQUEST#: {req_num}
-        KILL TIME: {kill_time}
-        """)
+        for item in data:
+            item_count += 1
+            km_id = item['killmail_id']
+            kill_time = item['kill_time']
+            vic = item['victim']
+            type_id = vic['ship_id']
+            group_id = vic['ship_group_id']
+            char_id = vic['character_id']
+            losses.append([km_id, kill_time, char_id, type_id, group_id, ])
+            total_items += 1
 
-        req_num += 1
-        time.sleep(.1)
-
-        logger.info('starting request >> call frt_km_query()')
-        data = frt_km_query(skip=skip, date_after=week_ago_ts)
-        skip += 1000
-
-        if data:
-            print(type(data))
-            for item in data:
-                item_count += 1
-                km_id = item['killmail_id']
-                kill_time = datetime.fromtimestamp(item['kill_time'])
-                vic = item['victim']
-                type_id = vic['ship_id']
-                group_id = vic['ship_group_id']
-                char_id = vic['character_id']
-                losses.append([km_id, kill_time, char_id, type_id, group_id, ])
-                total_items += 1
             logger.info(f'items added: {item_count}')
             logger.info(f'total items: {total_items}')
             logger.info(f'killmail id: {km_id}')
@@ -134,20 +134,37 @@ def get_ship_loss_stats():
             logger.info(f'skip: {skip}')
             logger.info(f'week ago: {week_ago}')
 
-        elif error_count > 10:
-            logger.error(f'error: too many errors, exiting')
-            break
-        else:
-            error_count += 1
-            logger.error(f'error: repeating request {req_num}')
-            logger.info(f'error count: {error_count}')
-            req_num = req_num - 1
-            time.sleep(1)
+    elif error_count > 10:
+        logger.error(f'error: too many errors, exiting')
+    else:
+        error_count += 1
+        logger.error(f'error: repeating request {req_num}')
+        logger.info(f'error count: {error_count}')
+        req_num = req_num - 1
+        time.sleep(1)
+    try:
+        logger.info('ending request, returning data')
+        logger.info(f'error count: {error_count}, ')
+
+        df = pd.DataFrame(losses, columns=['killmail_id', 'kill_time', 'character_id', 'type_id', 'group_id'])
+
+        # df['kill_time'] = pd.to_datetime(df['kill_time'], unit='s')
+
+        ts = datetime.now(tz=timezone.utc)
+        df['timestamp'] = ts
+        df['timestamp'] = pd.to_datetime(df['timestamp'])
+        df = df.drop_duplicates(subset=['killmail_id'])
+        df.reset_index(drop=True, inplace=True)
+
+        save_kill_stats(df=df)
+    except Exception as e:
+        print(e)
 
     logger.info('ending request, returning data')
     logger.info(f'error count: {error_count}, ')
 
-    df = pd.DataFrame(losses, columns=['killmail_id', 'kill_time', 'character_id', 'type_id', 'group_id'])
+    df = pd.DataFrame(losses, columns=['type_id', 'killmail_id', 'kill_time', 'character_id', 'group_id'])
+
     # df['kill_time'] = pd.to_datetime(df['kill_time'], unit='s')
 
     ts = datetime.now(tz=timezone.utc)
@@ -184,27 +201,31 @@ def aggregate_kills() -> pd.DataFrame or None:
     engine = create_engine(f'{mkt_sqlfile}')
     table = 'ShipsDestroyed'
 
-    with engine.connect() as conn:
-        df = pd.read_sql(table, conn)
+    try:
 
-    kills_by_type = agg_kills_by_type(df=df)
-    kills_by_day = agg_kills_by_day(df=df)
-    total_kills_by_day = agg_total_kills_by_day(df=df)
+        with engine.connect() as conn:
+            df = pd.read_sql(table, conn)
 
-    print('---------------------------------')
-    print(f'killmail count: {len(df)}')
-    print(df.head())
-    print(kills_by_type.head())
-    print(kills_by_day.head())
-    print(total_kills_by_day.head())
+        kills_by_type = agg_kills_by_type(df=df)
+        kills_by_day = agg_kills_by_day(df=df)
+        total_kills_by_day = agg_total_kills_by_day(df=df)
 
-    kills_by_type.to_csv('output/latest/aggregated_kills_by_type.csv', index=False)
-    kills_by_day.to_csv('output/latest/aggregated_kills_by_day.csv', index=False)
-    total_kills_by_day.to_csv('output/latest/aggregated_total_kills_by_day.csv', index=False)
+        print('---------------------------------')
+        print(f'killmail count: {len(df)}')
+        print(df.head())
+        print(kills_by_type.head())
+        print(kills_by_day.head())
+        print(total_kills_by_day.head())
 
+        kills_by_type.to_csv('output/latest/aggregated_kills_by_type.csv', index=False)
+        kills_by_day.to_csv('output/latest/aggregated_kills_by_day.csv', index=False)
+        total_kills_by_day.to_csv('output/latest/aggregated_total_kills_by_day.csv', index=False)
+
+    except Exception as ex:
+        print(ex)
 
 def agg_kills_by_type(df: pd.DataFrame) -> pd.DataFrame:
-    agg_kills_type = df.groupby(['type_id', 'type_name']).killmail_id.count().reset_index()
+    agg_kills_type = df.groupby(['type_id']).killmail_id.count().reset_index()
     agg_kills_type.rename(columns={'killmail_id': 'kill_count'}, inplace=True)
     return agg_kills_type
 
@@ -222,4 +243,14 @@ def agg_total_kills_by_day(df: pd.DataFrame) -> pd.DataFrame:
 
 
 if __name__ == '__main__':
-    pass
+    df = get_ship_loss_stats()
+
+    engine = create_engine('sqlite:///kils.db')
+    with engine.connect() as conn:
+        df.to_sql('ShipsDestroyed', conn, if_exists='replace', index=False)
+        print(df)
+
+    data = pd.read_sql(text('SELECT * FROM ShipsDestroyed'), engine)
+    data.reset_index(drop=True, inplace=True)
+
+    print(data)

@@ -97,7 +97,6 @@ def get_authorization_code(token=None, requested_scope=None):
     save_token(token)
     return token
 
-
 def get_oauth_session(token=None, requested_scope=None):
     # Get an OAuth session, refreshing the token if necessary.
     # Finally, we can open an Oath session.
@@ -115,7 +114,6 @@ def get_oauth_session(token=None, requested_scope=None):
         return OAuth2Session(
             CLIENT_ID, redirect_uri=CALLBACK_URI, scope=requested_scope
         )
-
 
 def save_token(token):
     # Save the OAuth token, including refresh token to a file.

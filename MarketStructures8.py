@@ -158,6 +158,7 @@ def fetch_market_orders():
         logger.error(print("{failed_pages_count} pages failed."))
     else:
         print('\nAll pages fetched successfully.')
+        logger.info(f'All pages fetched successfully.')
 
     logger.info(
         f"done. successfully retrieved {len(all_orders)}...")
