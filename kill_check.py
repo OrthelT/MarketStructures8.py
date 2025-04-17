@@ -243,14 +243,4 @@ def agg_total_kills_by_day(df: pd.DataFrame) -> pd.DataFrame:
 
 
 if __name__ == '__main__':
-    df = get_ship_loss_stats()
-
-    engine = create_engine('sqlite:///kils.db')
-    with engine.connect() as conn:
-        df.to_sql('ShipsDestroyed', conn, if_exists='replace', index=False)
-        print(df)
-
-    data = pd.read_sql(text('SELECT * FROM ShipsDestroyed'), engine)
-    data.reset_index(drop=True, inplace=True)
-
-    print(data)
+    pass
