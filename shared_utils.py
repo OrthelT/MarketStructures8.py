@@ -1,4 +1,4 @@
-import logging
+
 
 import pandas as pd
 import sqlalchemy
@@ -64,9 +64,11 @@ def get_doctrine_status_optimized(watchlist, target: int = 20) -> pd.DataFrame:
 
     df2 = df[reordered_cols]
     df2.reset_index(drop=True, inplace=True)
+
     df2.infer_objects()
     df3 = df2.copy()
-    df3.fillna(0, inplace=True)
+    df3 = df3.fillna(0, inplace=True)
+
     return df3
 
 def read_doctrine_watchlist() -> pd.DataFrame:
