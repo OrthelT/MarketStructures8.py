@@ -5,9 +5,10 @@ import sqlalchemy
 from matplotlib import pyplot as plt
 from sqlalchemy import create_engine, exc
 
+import logging_tool
 from doctrine_monitor import get_doctrine_fits, get_fit_items
 
-shared_logger = logging.getLogger('mkt_structures.shared_utils')
+shared_logger = logging_tool.configure_logging(log_name=__name__)
 mkt_sqldb = "sqlite:///market_orders.sqlite"
 fit_mysqldb = "mysql+pymysql://Orthel:Dawson007!27608@localhost:3306/wc_fitting"
 mkt_sqlfile = mkt_sqldb

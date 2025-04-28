@@ -6,6 +6,7 @@ from numpy import unique
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 
+import logging_tool
 from data_mapping import map_data, remap_reversable
 from models import JoinedInvTypes, Fittings_FittingItem as fittings_fittingitem
 
@@ -29,7 +30,7 @@ sde_db = r"sqlite:///C:/Users/User/PycharmProjects/ESI_Utilities/SDE/SDE sqlite-
 
 from logging import getLogger
 
-logger = getLogger('mkt_structures.parse_fits')
+logger = logging_tool.configure_logging(log_name=__name__)
 
 def parse_cargo(item) -> dict or None:
     t = search(cargo_regex, item)

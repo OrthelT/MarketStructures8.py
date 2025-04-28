@@ -1,13 +1,14 @@
 
-import logging
 
 import pandas as pd
 import sqlalchemy
 
+import logging_tool
+
 mkt_sqlfile = "sqlite:///market_orders.sqlite"
 fit_mysqlfile = "mysql+pymysql://Orthel:Dawson007!27608@localhost:3306/wc_fitting"
 
-logger = logging.getLogger('mkt_structures.doctrine_monitor')
+logger = logging_tool.configure_logging(log_name=__name__)
 
 def get_doctrine_fits(db_name: str = 'wc_fitting') -> pd.DataFrame:
     logger.info('accessing_db and getting doctrine fits table...')

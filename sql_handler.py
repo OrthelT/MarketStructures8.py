@@ -8,13 +8,13 @@ from matplotlib.ticker import FuncFormatter
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import declarative_base
 
+import logging_tool
 from data_mapping import remap_reversable, reverse_remap
 from shared_utils import read_doctrine_watchlist, get_doctrine_status_optimized
 
-sql_logger = logging.getLogger('mkt_structures.sql_handler')
-brazil_logger = logging.getLogger('mkt_structures.brazil_logger')
-brazil_logger.addHandler(logging.FileHandler('logs/brazil_logger.log'))
-brazil_logger.setLevel(logging.INFO)
+sql_logger = logging_tool.configure_logging(log_name=__name__)
+brazil_logger = logging_tool.configure_logging(log_name="brazil")
+
 
 sql_file = "market_orders.sqlite"
 mkt_sqlfile = "sqlite:///market_orders.sqlite"

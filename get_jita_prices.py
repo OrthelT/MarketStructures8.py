@@ -1,9 +1,10 @@
 import json
-import logging
 from datetime import datetime, timedelta
 
 import pandas as pd
 import requests
+
+import logging_tool
 
 sde_db = r"sqlite:///C:/Users/User/PycharmProjects/ESI_Utilities/SDE/SDE sqlite-latest.sqlite"
 
@@ -15,7 +16,7 @@ basket_ids = df.type_id.to_list()
 ids = basket_ids[:6]
 ids = [int(x) for x in ids]
 
-logger = logging.getLogger('mkt_structures.get_jita_prices')
+logger = logging_tool.configure_logging(log_name=__name__)
 
 
 def get_jita_price_data(type_ids: list) -> pd.DataFrame:

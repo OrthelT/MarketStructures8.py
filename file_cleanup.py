@@ -1,8 +1,8 @@
-import logging
 import os
 import shutil
+import logging_tool
 
-logger = logging.getLogger('mkt_structures.file_cleanup')
+logger = logging_tool.configure_logging(log_name=__name__)
 
 def rename_move_and_archive_csv(src_folder, latest_folder, archive_folder, full_cleanup):
     # Find all files matching the pattern 'valemarketstats_*.csv' in the source folder

@@ -1,5 +1,4 @@
 import argparse
-import argparse
 import logging
 import os
 import shutil
@@ -62,7 +61,7 @@ merged_sell_filename = (
 )
 master_history_filename = "data/masterhistory/valemarkethistory_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.csv"
 
-logger = configure_logging("mkt_structures", "logs/mkt_struct.log")
+logger = configure_logging()
 
 # ===============================================
 # Functions: Fetch Market Structure Orders
