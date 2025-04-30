@@ -351,6 +351,8 @@ def history_merge(history_data: pd.DataFrame) -> pd.DataFrame:
 def update_doctrine_status(target: int = 20):
     logger.info("checking doctrines | update_doctrine_status()")
     target_df = get_doctrine_status_optimized(watchlist, target=target)
+    target_df = target_df.reset_index(drop=True)
+
     target_df = target_df[~target_df['fit'].str.startswith("zz ")]
     target_df.to_csv("output/latest/doctrines_on_market.csv", index=False)
     status = google_sheet_updater.google_sheet_updater_doctrine_items(target_df)

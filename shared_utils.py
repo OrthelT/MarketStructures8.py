@@ -62,13 +62,19 @@ def get_doctrine_status_optimized(watchlist, target: int = 20) -> pd.DataFrame:
                       'days', '4H price', 'avg vol', 'avg price', 'delta', 'doctrine', 'group', 'cat id',
                       'grp id', 'doc id', 'ship id', 'timestamp']
 
-    df2 = df[reordered_cols]
-    df2.reset_index(drop=True, inplace=True)
+    try:
+        df2 = df[reordered_cols]
+    except Exception as e:
+        shared_logger.error(f'failed to reorder {reordered_cols},{e}')
+
+    shared_logger.info(type(df2))
+    df2 = df2.reset_index(drop=True)
+    shared_logger.info(type(df2))
 
     df2.infer_objects()
     df3 = df2.copy()
-    df3 = df3.fillna(0, inplace=True)
-
+    df3 = df3.fillna(0)
+    df3 = df3.reset_index(drop=True)
     return df3
 
 def read_doctrine_watchlist() -> pd.DataFrame:
