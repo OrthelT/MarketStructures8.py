@@ -2,6 +2,8 @@
 
 import pandas as pd
 import sqlalchemy
+import sqlalchemy.orm as orm
+from sqlalchemy import create_engine, select, text
 
 import logging_tool
 
@@ -108,6 +110,45 @@ def get_fit_items(df: pd.DataFrame):
     fit_items = df4[['type_id', 'type_name', 'quantity', 'doctrine_name', 'ship_type_name', 'ship_type_id', 'fit_id', ]]
     fit_items.type_id = fit_items.type_id.astype(int)
     return fit_items
+
+def add_watch_doctrine(doctrine_id: int)->str:
+    engine = sqlalchemy.create_engine(fit_mysqlfile, echo=True)
+    status = "not updated"
+
+    query = f"""INSERT INTO watch_doctrines 
+            SELECT * 
+            FROM fittings_doctrine 
+            where id = {doctrine_id};"""
+    print(query)
+    logger.info('adding doctrine to watch_doctrines table...')
+
+    try:
+        with engine.connect() as conn:
+            conn.execute(text(query))
+            conn.commit()
+            status = "success"
+    except Exception as e:
+        print(f"unable to add doctrine item: {e}")
+        logger.error(f"unable to add doctrine item: {e}")
+        status = "error - update failed"
+
+    query2 = f"SELECT * FROM watch_doctrines WHERE id = ({doctrine_id});"
+    try:
+        with engine.connect() as conn:
+            results = conn.execute(text(query2))
+            if results:
+                status = "success"
+                data = results.fetchall()
+                for row in data:
+                    print(row)
+            else:
+                status = "not updated"
+    except Exception as e:
+        print(f"unable to find doctrine in watch_doctrines table: {e}")
+        logger.error(f"unable to find doctrine in watch_doctrines table: {e}")
+        status = "error - update not found"
+
+    return status
 
 
 
