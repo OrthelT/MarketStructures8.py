@@ -1,0 +1,46 @@
+
+__pycache__/
+*.py[cod]
+*.so
+
+# Virtual environment
+.venv/
+.env
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+output/error_logs/compiled errorlog.csv
+/backupfolder/
+/data/short_files/history_response_1727575610970.json
+/data/short_files/outputmarketdata.csv
+
+/testandtrash.py
+/token.json
+/data/short_files/ESI_response_1727564594858.json
+/.venv/market_VCS/
+/output/
+/api_endpoint_character_info.http
+/.idea/swagger-settings.xml
+endpoints/
+.idea/*
+data/*
+
+market_orders.sqlite
+
+logs/
+tests/
+test*
+/missing_icons.csv
+/doctrines.csv
+
+fits/
+.idea/*
+.ipynb_checkpoints/*
+*.json
+*.csv
+market_orders.sqlite
+*.log
+backup/
