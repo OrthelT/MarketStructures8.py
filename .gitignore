@@ -44,3 +44,6 @@ fits/
 market_orders.sqlite
 *.log
 backup/
+icon_market.png
+icon_turso.png
+launcher_mktq.py
