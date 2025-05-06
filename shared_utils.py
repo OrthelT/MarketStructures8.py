@@ -189,19 +189,6 @@ def read_full_history() -> pd.DataFrame:
         df = pd.read_sql_table('full_market_history', conn)
     return df
 
-
-def load_full_history() -> None:
-    df = read_market_orders()
-    ids = df.type_id.unique().tolist()
-    pd.set_option('display.max_columns', None)
-    df2, history_dict = fetch_market_history(True, id_list=ids)
-
-    engine = create_engine(mkt_sqlfile, echo=False)
-    with engine.connect() as conn:
-        df2.to_sql('full_market_history', conn, if_exists='replace', index=False)
-    print('full history loaded')
-
-
 def get_30_days_trade_volume() -> pd.DataFrame:
     df = read_full_history()
     df['isk_volume'] = df['volume'] * df['average']
@@ -236,6 +223,7 @@ def get_doctrine_mkt_status() -> pd.DataFrame:
                 JOIN fittings_doctrine_fittings fdf on w.id = fdf.doctrine_id
                 """
         df = pd.read_sql_query(query, connection)
+        df.to_csv("output/brazil/doctrine_map.csv", index=False)
 
     # Process the results
     df_fittings = df.drop_duplicates(subset=['fitting_id'])

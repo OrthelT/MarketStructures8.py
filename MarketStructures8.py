@@ -75,6 +75,7 @@ def fetch_market_orders():
     headers = {
         "Authorization": f'Bearer {token["access_token"]}',
         "Content-Type": "application/json",
+        "User-Agent": "WC Markets v0.43 (admin contact: Orthel.Toralen@gmail.com; +https://github.com/OrthelT/ESIMarket_Tool",
     }
 
     page = 1
@@ -184,6 +185,7 @@ def fetch_market_history(fresh_data: bool = True, id_list: list[Any] | None = No
 
         headers = {
             "Content-Type": "application/json",
+            "User-Agent": "WC Markets v0.43 (admin contact: Orthel.Toralen@gmail.com; +https://github.com/OrthelT/ESIMarket_Tool",
         }
         all_history = []
         page = 1
