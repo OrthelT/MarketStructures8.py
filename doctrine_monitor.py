@@ -61,7 +61,6 @@ def get_doctrine_fits(db_name: str = 'wc_fitting') -> pd.DataFrame:
 
     return df
 
-
 def get_fit_items(df: pd.DataFrame):
     cols = ['id', 'name', 'ship_type_id', 'type_name']
     df = df.rename({'id': 'fit_id', 'name': 'doctrine_name'}, axis="columns")

@@ -132,6 +132,65 @@ def read_doctrine_watchlist() -> pd.DataFrame:
 
     return df2
 
+
+def read_doctrine_info() -> pd.DataFrame:
+    """READS DOCTRINE INFO AND EXPORTS TO CSV FOR USE WITH WC MARKETS"""
+    shared_logger.info('reading doctrine watchlist')
+    try:
+        # Create the connection string without quotes around database name
+        mysql_connection = fit_mysqldb
+        # Create engine with echo=True to see SQL output for debugging
+        engine = sqlalchemy.create_engine(mysql_connection, echo=False)
+        shared_logger.info('MySql db connection established')
+        shared_logger.info('accessing doctrines...')
+
+        # Test the connection before executing query
+        with engine.connect() as connection:
+            # Your SQL query
+            query = """
+                    SELECT t.type_id, f.doctrine_id, t.fit_id, w.name as doctrine_name, ff.name as fit_name
+                    FROM watch_doctrines as w
+                             JOIN fittings_doctrine_fittings f on w.id = f.doctrine_id
+                             JOIN fittings_fittingitem t on f.fitting_id = t.fit_id
+                             JOIN fittings_type ft on t.type_id = ft.type_id 
+                             JOIN fittings_fitting ff on ff.id = f.fitting_id
+                    """
+            # Execute query and convert to DataFrame
+            df = pd.read_sql_query(query, connection)
+            print(f"""
+            ===============
+            Doctrine watchlist retrieved: {len(df)} items
+            """)
+        # merge in type info for compatability with Mkt Sql file
+    #     engine = create_engine(mkt_sqldb)
+    #     with engine.connect() as conn:
+    #         type_info = pd.read_sql_table('JoinedInvTypes', conn)
+
+    except exc.OperationalError as e:
+        shared_logger.error(f"Database connection error: {str(e)}")
+    except exc.ProgrammingError as e:
+        shared_logger.error(f"SQL query error: {str(e)}")
+    except Exception as e:
+        shared_logger.error(f"Unexpected error: {str(e)}")
+    #
+    # old_cols = ['typeID', 'groupID', 'typeName', 'groupName', 'categoryID',
+    #             'categoryName']
+    # drop_cols = ['metaGroupID',
+    #              'metaGroupName']
+    # new_cols = ['type_id', 'group_id', 'type_name', 'group_name', 'category_id',
+    #             'category_name']
+    #
+    # type_info.drop(columns=drop_cols, inplace=True)
+    # type_info.rename(columns=dict(zip(old_cols, new_cols)), inplace=True)
+    #
+    # df2 = pd.merge(df, type_info, on='type_id', how='left').reset_index(drop=True)
+    # df2.infer_objects()
+
+    df = df.reset_index(drop=True)
+    df.to_csv("output/brazil/doctrine_info.csv", index=False)
+
+    return df
+
 def fill_missing_stats_v2(df: pd.DataFrame, watchlist: pd.DataFrame) -> pd.DataFrame:
     shared_logger.info('checking missing stats...starting')
     stats = df
@@ -416,3 +475,5 @@ def handle_zero_dates(df: pd.DataFrame) -> pd.DataFrame:
 
 if __name__ == '__main__':
     pass
+
+

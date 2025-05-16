@@ -228,7 +228,7 @@ def fetch_market_history(fresh_data: bool = True, id_list: list[Any] | None = No
                             tries += 1
                             continue
                         elif tries == 5:
-                            print(
+                            logger.info(
                                 f"Unable to retrieve any data for {item}. Moving on to the next..."
                             )
                             page = 1
