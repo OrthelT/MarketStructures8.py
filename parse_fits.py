@@ -1,14 +1,16 @@
 import re
 from re import search
+from dataclasses import dataclass, field
+from typing import Optional, Generator, List
 
 import pandas as pd
 from numpy import unique
 from sqlalchemy import create_engine, text
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import sessionmaker, Session
 
 import logging_tool
 from data_mapping import map_data, remap_reversable
-from models import JoinedInvTypes, Fittings_FittingItem as fittings_fittingitem
+from models import JoinedInvTypes, Fittings_FittingItem as fittings_fittingitem, Fittings_FittingItem
 
 fitting_schema = [
     "type_id", "type_name", "group", "group_id", "category", "category_id",
@@ -31,6 +33,46 @@ sde_db = r"sqlite:///C:/Users/User/PycharmProjects/ESI_Utilities/SDE/SDE sqlite-
 from logging import getLogger
 
 logger = logging_tool.configure_logging(log_name=__name__)
+
+@dataclass
+class FittingItem:
+    flag: str
+    quantity: int
+    fit_id: int
+    type_name: str
+    ship_type_name: str
+    fit_name: Optional[str] = None
+
+    # Declare attributes that will be assigned in __post_init__
+    type_id: int = field(init=False)
+    type_fk_id: int = field(init=False)
+    details: dict = field(init=False)
+
+    def __post_init__(self) -> None:
+        self.type_id = self.get_type_id()
+        self.type_fk_id = self.type_id  # optional alias
+        self.details = self.get_fitting_details()
+        self.description = self.details['description']
+
+        #retrieve the fit name if we need it
+        if self.fit_name is None and "name" in self.details:
+            self.fit_name = self.details["name"]
+
+    def get_type_id(self) -> int:
+        engine = create_engine(fittings_db, echo=False)
+        query = text("SELECT type_id FROM fittings_type WHERE type_name = :type_name")
+        with engine.connect() as conn:
+            result = conn.execute(query, {"type_name": self.type_name}).fetchone()
+            return result[0] if result else -1  # return a sentinel or raise error
+
+    def get_fitting_details(self) -> dict:
+        engine = create_engine(fittings_db, echo=False)
+        query = text("SELECT * FROM fittings_fitting WHERE id = :fit_id")
+        with engine.connect() as conn:
+            row = conn.execute(query, {"fit_id": self.fit_id}).fetchone()
+            print(row)
+            return dict(row._mapping) if row else {}
+
 
 def parse_cargo(item) -> dict or None:
     t = search(cargo_regex, item)
@@ -176,7 +218,6 @@ def get_type_info_ORM(df, by_id: bool = False) -> pd.DataFrame:
 
     return df3
 
-
 def prepare_write_to_fitting_items(df: pd.DataFrame, fit_id: int) -> pd.DataFrame or None:
     if 'qty' in df.columns:
         df.rename(columns={'qty': 'quantity'}, inplace=True)
@@ -210,7 +251,6 @@ def prepare_write_to_fitting_items(df: pd.DataFrame, fit_id: int) -> pd.DataFram
     df3.to_csv(f'data/{fit_id}_fittings_fittingitem.csv', index=False)
 
     return df3
-
 
 def parse_quantities(df: pd.DataFrame) -> pd.DataFrame:
     df2 = df[df['flag'].apply(lambda x: search(digit_end, x) is not None)]
@@ -248,7 +288,6 @@ def parse_quantities(df: pd.DataFrame) -> pd.DataFrame:
         df.to_sql('fittings_fittingitem', conn, if_exists='append', index=False)
 
     return df
-
 
 def parse_fit_number(fit_num: int) -> pd.DataFrame:
     engine = create_engine(fittings_db)
@@ -293,5 +332,61 @@ def parse_fit_number(fit_num: int) -> pd.DataFrame:
     df6['fits'] = (df6.volume / df6.quantity).round(0)
     return df
 
+def slot_yielder() -> Generator[str, None, None]:
+    """
+    Yields the expected EFT fitting slot flags in order.
+    """
+    slots = ['LoSlot', 'MedSlot', 'HiSlot', 'RigSlot', 'DroneBay', 'Cargo']
+    for slot in slots:
+        yield slot
+
+def process_fit(text_file: str, fit_id: int):
+
+    fit = []
+    qty = None
+    with open(fit_file, 'r') as f:
+        for line in f:
+
+            if line == '':
+                slot = next(yield_slot())
+            if "," in line:
+                clean_name = line.strip().strip('[').strip(']')
+                ship_name = clean_name.split(',')[0]
+                fit_name = clean_name.split(',')[1].strip()
+                item = ship_name
+            elif line == '\n':
+                slot = next(yield_slot())
+                continue
+            elif re.search(r'x[0-9]', line):
+                item_group = line.split(" x")
+                item = item_group[0].strip()
+                qty = item_group[1].strip()
+                qty = int(qty)
+            else:
+                item = line.strip()
+
+            fitting_item = FittingItem(
+                flag=slot,
+                fit_id=fit_id,
+                type_name=item,
+                ship_type_name=ship_name,
+                fit_name=fit_name,
+                quantity= qty if not None else 1
+            )
+            fit.append([
+                        fitting_item.flag,
+                        fitting_item.quantity,
+                        fitting_item.type_id,
+                        fitting_item.fit_id,
+                        fitting_item.type_fk_id
+                        ])
+        return fit
+
 if __name__ == '__main__':
-    pass
+    pd.set_option('display.max_columns', None)
+    pd.set_option('display.max_rows', None)
+
+    fit_file = "drake2501_39.txt"
+
+    fit = process_fit(fit_file, 39)
+    print(fit)

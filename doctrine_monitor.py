@@ -149,8 +149,26 @@ def add_watch_doctrine(doctrine_id: int)->str:
 
     return status
 
+def get_fit_name(fit_id: int)->str:
+    print(fit_id)
+    engine = sqlalchemy.create_engine(fit_mysqlfile, echo=True)
+    query = f"SELECT name FROM fittings_fitting WHERE id = :id;"
+    with engine.connect() as conn:
+        results = conn.execute(text(query), {"id": fit_id})
 
+        row = results.fetchone()
+        print(row)
+        if row is not None:
+            return row[0]
+        else:
+            return "not found"
 
 
 if __name__ == "__main__":
-    pass
+    engine = sqlalchemy.create_engine(fit_mysqlfile, echo=True)
+    query = f"SELECT * FROM fittings_fitting WHERE ship_type_id = 24698;"
+    with engine.connect() as conn:
+        results = conn.execute(text(query))
+        row = results.fetchone()
+        if row is not None:
+            print(row)
