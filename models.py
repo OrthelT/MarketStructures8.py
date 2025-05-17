@@ -142,14 +142,23 @@ class JoinedInvTypes(Base):
     metaGroupID: Mapped[int] = mapped_column(Integer)
     metaGroupName: Mapped[Optional[str]] = mapped_column(String(100))
 
+
 class Fittings_FittingItem(Base):
     __tablename__ = "fittings_fittingitem"
+
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     flag: Mapped[str] = mapped_column(String(25))
     quantity: Mapped[int] = mapped_column(Integer)
     type_id: Mapped[int] = mapped_column(Integer)
     fit_id: Mapped[int] = mapped_column(Integer)
     type_fk_id: Mapped[int] = mapped_column(BigInteger)
+
+    def __repr__(self):
+        return (
+            f"<FittingItem flag='{self.flag}', qty={self.quantity}, "
+            f"type_id={self.type_id}, fit_id={self.fit_id}>"
+        )
+
 
 if __name__ == '__main__':
     pass

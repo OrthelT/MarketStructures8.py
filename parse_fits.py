@@ -333,11 +333,17 @@ def parse_fit_number(fit_num: int) -> pd.DataFrame:
 
 def slot_yielder() -> Generator[str, None, None]:
     """
-    Yields the expected EFT fitting slot flags in order.
+    Yields EFT slot flags in correct order.
+    Once primary sections are consumed, defaults to 'Cargo'.
     """
-    slots = ['LoSlot', 'MedSlot', 'HiSlot', 'RigSlot', 'DroneBay', 'Cargo']
-    for slot in slots:
+    corrected_order = ['LoSlot', 'MedSlot', 'HiSlot', 'RigSlot', 'DroneBay']
+    for slot in corrected_order:
         yield slot
+    while True:
+        yield 'Cargo'
+
+
+from collections import defaultdict
 
 def process_fit(fit_file: str, fit_id: int) -> List[List]:
     fit = []
@@ -346,26 +352,22 @@ def process_fit(fit_file: str, fit_id: int) -> List[List]:
     current_slot = next(slot_gen)
     ship_name = ""
     fit_name = ""
+    slot_counters = defaultdict(int)
 
     with open(fit_file, 'r', encoding='utf-8') as f:
         for line in f:
             line = line.strip()
             if not line:
-                try:
-                    current_slot = next(slot_gen)
-                except StopIteration:
-                    current_slot = "Overflow"
+                current_slot = next(slot_gen)
                 continue
 
             if line.startswith("[") and line.endswith("]"):
-                # Parse header
                 clean_name = line.strip('[]')
                 parts = clean_name.split(',')
                 ship_name = parts[0].strip()
                 fit_name = parts[1].strip() if len(parts) > 1 else "Unnamed Fit"
                 continue
 
-            # Parse line with quantity (e.g., "Nanite Repair Paste x50")
             qty_match = re.search(r'\s+x(\d+)$', line)
             if qty_match:
                 qty = int(qty_match.group(1))
@@ -374,8 +376,16 @@ def process_fit(fit_file: str, fit_id: int) -> List[List]:
                 qty = 1
                 item = line.strip()
 
+            # Determine slot name
+            if current_slot in {'LoSlot', 'MedSlot', 'HiSlot', 'RigSlot'}:
+                slot_suffix = slot_counters[current_slot]
+                slot_counters[current_slot] += 1
+                slot_name = f"{current_slot}{slot_suffix}"
+            else:
+                slot_name = current_slot  # 'Cargo' or 'DroneBay'
+
             fitting_item = FittingItem(
-                flag=current_slot,
+                flag=slot_name,
                 fit_id=fit_id,
                 type_name=item,
                 ship_type_name=ship_name,
@@ -408,6 +418,57 @@ def insert_fitting_items(fit_data: List[List], session: Session):
     session.execute(stmt)
     session.commit()
 
+def replace_fit_items(fit_file: str, fit_id: int, session: Session):
+    try:
+        # Step 1: Parse
+        fit_data = process_fit(fit_file, fit_id)
+        if not fit_data:
+            raise ValueError(f"No fitting items parsed from '{fit_file}'.")
+
+        # Step 2: Validate
+        items = []
+        for i, row in enumerate(fit_data):
+            flag, qty, type_id, fit_id_val, type_fk_id = row
+
+            if not flag or not isinstance(flag, str):
+                raise ValueError(f"Row {i}: Invalid flag: {flag}")
+            if not isinstance(qty, int) or qty <= 0:
+                raise ValueError(f"Row {i}: Invalid quantity: {qty}")
+            if not isinstance(type_id, int) or type_id <= 0:
+                raise ValueError(f"Row {i}: Invalid type_id: {type_id}")
+            if fit_id_val != fit_id:
+                raise ValueError(f"Row {i}: Mismatched fit_id: {fit_id_val}")
+            if type_fk_id != type_id:
+                raise ValueError(f"Row {i}: type_fk_id does not match type_id ({type_fk_id} != {type_id})")
+
+            item = Fittings_FittingItem(
+                flag=flag,
+                quantity=qty,
+                type_id=type_id,
+                fit_id=fit_id,
+                type_fk_id=type_fk_id
+            )
+            items.append(item)
+
+        # Step 3: Show preview
+        print("\nProposed replacement data:")
+        for item in items:
+            print("  ", item)
+
+        confirm = input(f"\nReplace existing entries for fit_id={fit_id}? (y/n): ").strip().lower()
+        if confirm != "y":
+            print("Aborted by user. No changes made.")
+            return
+
+        # Step 4: Transaction
+        session.execute(delete(Fittings_FittingItem).where(Fittings_FittingItem.fit_id == fit_id))
+        session.add_all(items)
+        session.commit()
+        print(f"✅ Successfully replaced {len(items)} fitting items for fit_id={fit_id}.")
+
+    except Exception as e:
+        session.rollback()
+        print(f"❌ Error occurred: {e}")
 
 if __name__ == '__main__':
     pd.set_option('display.max_columns', None)
@@ -415,7 +476,15 @@ if __name__ == '__main__':
 
     fit_file = "drake2501_39.txt"
 
-    fit = process_fit(fit_file, 39)
+    # Create engine
+    engine = create_engine(fittings_db, echo=False)
+
+    # Create configured session factory
+    SessionLocal = sessionmaker(bind=engine)
+
+    with SessionLocal() as session:
+        replace_fit_items(fit_file, fit_id=39, session=session)
+
 
 
 
