@@ -3,7 +3,7 @@ from re import search
 from dataclasses import dataclass, field
 from typing import Optional, Generator, List
 from collections import defaultdict
-
+from datetime import datetime
 
 import pandas as pd
 from numpy import unique
@@ -12,23 +12,9 @@ from sqlalchemy.orm import sessionmaker, Session
 
 import logging_tool
 from data_mapping import map_data, remap_reversable
-from models import JoinedInvTypes, Fittings_FittingItem
+from models import JoinedInvTypes, Fittings_FittingItem, Fittings_Fitting
 
 fittings_fittingitem = Fittings_FittingItem
-
-fitting_schema = [
-    "type_id", "type_name", "group", "group_id", "category", "category_id",
-    "fit", "fit_id", "doctrine", "doctrine_id",
-    "ship", "ship_id", "qty"
-]
-
-fits_folder = 'fits'
-CFI = 'fits/[Cyclone Fleet Issue,  2502 WC-EN C.txt'
-
-cargo_regex = r'x\d+'
-digit_end = r'\d$'
-
-cargo_list = []
 
 fittings_db = r"mysql+pymysql://Orthel:Dawson007!27608@localhost:3306/wc_fitting"
 mkt_db = "sqlite:///market_orders.sqlite"
@@ -57,9 +43,16 @@ class FittingItem:
         self.details = self.get_fitting_details()
         self.description = self.details['description']
 
-        #retrieve the fit name if we need it
-        if self.fit_name is None and "name" in self.details:
-            self.fit_name = self.details["name"]
+        # Only set it if it's not already passed from EFT
+        if self.fit_name is None:
+            if "name" in self.details:
+                self.fit_name = self.details["name"]
+                if "name" in self.details and self.fit_name != self.details["name"]:
+                    logger.warning(
+                        f"Fit name mismatch: parsed='{self.fit_name}' vs DB='{self.details['name']}'"
+                    )
+            else:
+                self.fit_name = f"Default {self.ship_type_name} fit"
 
     def get_type_id(self) -> int:
         engine = create_engine(fittings_db, echo=False)
@@ -75,263 +68,14 @@ class FittingItem:
             row = conn.execute(query, {"fit_id": self.fit_id}).fetchone()
             return dict(row._mapping) if row else {}
 
-
-def parse_cargo(item) -> dict or None:
-    t = search(cargo_regex, item)
-    if t:
-        entry = {'type_name': item[0:t.start() - 1], 'qty': item[t.start() + 1:t.end()]}
-        return entry
-    else:
-        return None
-
-
-def parse_fit(text_file, totals=False) -> pd.DataFrame or None:
-    with open(text_file, 'r') as f:
-        data = f.read()
-    items = clean_items(data)
-    cargo_list = []
-    modules = []
-    module_list = []
-    # clean items
-    fittings = []
-
-    name = items[0]
-    for i, item in enumerate(items[1:]):
-
-        if re.search(cargo_regex, item) and i != 0:
-            cargo_item = parse_cargo(item)
-            cargo_item['fit_name'] = name
-            cargo_list.append(cargo_item)
-
-        else:
-            modules.append(item)
-
-    if totals:
-        unique_modules = unique(modules)
-
-        for module in unique_modules:
-            module_item = {'type_name': module, 'qty': modules.count(module), 'fit_name': name}
-            module_list.append(module_item)
-
-    for module in modules:
-        module_item = {'type_name': module, 'qty': 1, 'fit_name': name}
-        module_list.append(module_item)
-
-    fittings.extend(module_list)
-    fittings.extend(cargo_list)
-
-    df = pd.DataFrame(fittings, columns=['type_name', 'qty', 'fit_name'])
-
-    df.type_name = df.type_name.apply(lambda x: x.strip())
-
-    return df
-
-def clean_items(items):
-    clean_items = [x for x in items.splitlines()]
-    clean_items = [x for x in clean_items if len(x) != 0]
-    return clean_items
-
-def get_names(df) -> pd.DataFrame:
-    df1 = map_data(df)
-
-    names = df1['type_name'].unique().tolist()
-    engine = create_engine(mkt_db)
-    data = []
-
-    for name in names:
-        fit_name = name
-
-        with engine.connect() as conn:
-            type_info = conn.execute(
-                text("""SELECT * FROM joinedinvtypes 
-                WHERE joinedinvtypes.typeName = :y"""),
-                {"y": fit_name})
-            data.append(type_info.fetchone())
-
-    df2 = pd.DataFrame(data)
-
-    return df2
-
-
-def update_fittings_type(df, adds: dict) -> pd.DataFrame or None:
-    df.drop(columns=['raceID', 'basePrice', 'soundID', 'portionSize'], inplace=True)
-
-    fit_info = ['type_name', 'type_id', 'published', 'mass', 'capacity',
-                'description', 'volume', 'packaged_volume', 'portion_size', 'radius',
-                'graphic_id', 'icon_id', 'market_group_id', 'group_id']
-
-    type_info = ['typeID', 'groupID', 'typeName', 'description', 'mass', 'volume',
-                 'capacity', 'portionSize', 'raceID', 'basePrice', 'published',
-                 'marketGroupID', 'iconID', 'soundID', 'graphicID']
-
-    type_to_rename = ['typeName', 'typeID', 'groupID', 'volume',
-                      'graphicID', 'iconID', 'marketGroupID']
-
-    mew_name = ['type_name', 'type_id', 'group_id', 'packaged_volume', 'graphic_id',
-                   'icon_id', 'market_group_id', ]
-
-    rename_cols = dict(zip(type_to_rename, mew_name))
-
-    df.rename(columns=rename_cols, inplace=True)
-
-    add_cols = adds
-
-    for k, v in add_cols.items():
-        df[k] = v
-
-    engine = create_engine(fittings_db)
-    with engine.connect() as conn:
-        df.to_sql('fittings_type', conn, if_exists='append', index=False)
-
-    print("fit_updated")
-
-def get_type_info_ORM(df, by_id: bool = False) -> pd.DataFrame:
-
-    df1 = map_data(df)
-
-    engine = create_engine(mkt_db)
-    Session = sessionmaker(bind=engine)
-
-    with Session() as session:
-        if by_id:
-            ids = df1['type_id'].unique().tolist()
-            id_types = session.query(JoinedInvTypes.typeId, JoinedInvTypes.typeName, JoinedInvTypes.groupID,
-                                     JoinedInvTypes.groupName).filter(JoinedInvTypes.typeId.in_(ids)).all()
-            join_value = 'type_id'
-            df_const = id_types
-            drop_list = [
-                'type_name', 'group_id', 'group_name'
-            ]
-        else:
-            names = df1['type_name'].unique().tolist()
-            name_types = session.query(JoinedInvTypes.typeId, JoinedInvTypes.typeName, JoinedInvTypes.groupID,
-                                       JoinedInvTypes.groupName).filter(JoinedInvTypes.typeName.in_(names)).all()
-            join_value = 'type_name'
-            df_const = name_types
-            drop_list = [
-                'type_id', 'group_id. group_name'
-            ]
-
-    df2 = pd.DataFrame(df_const)
-    df.drop(columns=drop_list, inplace=True)
-    df2, reversal = remap_reversable(df2)
-    df3 = df.merge(df2, on=join_value, how='left')
-    df3 = df3.reset_index(drop=True)
-
-    return df3
-
-def prepare_write_to_fitting_items(df: pd.DataFrame, fit_id: int) -> pd.DataFrame or None:
-    if 'qty' in df.columns:
-        df.rename(columns={'qty': 'quantity'}, inplace=True)
-
-    df = df[['type_id', 'quantity']]
-    type_id = df['type_id'].unique().tolist()
-
-    engine = create_engine(fittings_db)
-    Session = sessionmaker(bind=engine)
-
-    with Session() as session:
-        flags = session.query(fittings_fittingitem.flag,
-                              fittings_fittingitem.type_id,
-                              fittings_fittingitem.type_fk_id).filter(
-            fittings_fittingitem.type_id.in_(type_id))
-    session.close()
-    df2 = pd.DataFrame(flags)
-    df2.drop_duplicates(subset=['type_id'], inplace=True)
-    df2 = df2.reset_index(drop=True)
-
-    df3 = pd.merge(df, df2, on='type_id', how='left')
-    df3 = df3.reset_index(drop=True)
-
-    df3['fit_id'] = fit_id
-    df3['flag'] = df3.apply(lambda row: "HighSlot0" if pd.isnull(row['flag']) else row['flag'], axis=1)
-
-    df3.type_fk_id = df3.type_fk_id.fillna(df3.type_id)
-
-
-
-    df3.to_csv(f'data/{fit_id}_fittings_fittingitem.csv', index=False)
-
-    return df3
-
-def parse_quantities(df: pd.DataFrame) -> pd.DataFrame:
-    df2 = df[df['flag'].apply(lambda x: search(digit_end, x) is not None)]
-
-    df2 = df2.reset_index(drop=True)
-    df2 = df2[df2.quantity > 1]
-    df2['flag'] = df2['flag'].str[:-1]
-    qty = {}
-    flg = {}
-
-    for i, row in df2.iterrows():
-        qty.update({row['type_id']: row['quantity']})
-        flg.update({row['type_id']: row['flag']})
-
-    drops = df[df.type_id.isin(qty.keys())]
-    df.drop(index=drops.index, inplace=True)
-    df = df.reset_index(drop=True)
-
-
-    df3 = pd.DataFrame()
-    for k, v in qty.items():
-        for i in range(0, v):
-            df3.loc[i, 'type_id'] = int(k)
-            df3.loc[i, 'quantity'] = int(1)
-            df3.loc[i, 'flag'] = str(flg[k]) + str(i + 1)
-            df3.loc[i, 'fit_id'] = int(492)
-            df3.loc[i, 'type_fk_id'] = int(k)
-        df = pd.concat([df, df3]).reset_index(drop=True)
-
-    df[['type_id', 'quantity', 'fit_id', 'type_fk_id']] = df[['type_id', 'quantity', 'fit_id', 'type_fk_id']].astype(
-        int)
-
-    engine = create_engine(fittings_db)
-    with engine.connect() as conn:
-        df.to_sql('fittings_fittingitem', conn, if_exists='append', index=False)
-
-    return df
-
-def parse_fit_number(fit_num: int) -> pd.DataFrame:
-    engine = create_engine(fittings_db)
-    with engine.connect() as conn:
-        df = pd.read_sql_table('fittings_fittingitem', engine)
-        df = df[df.fit_id == fit_num]
-    engine.dispose()
-    df3 = df.groupby('type_id')['quantity'].sum().reset_index()
-
-    engine = create_engine(mkt_db)
-    with engine.connect() as conn:
-        df2 = pd.read_sql_table('JoinedInvTypes', conn)
-    engine.dispose()
-
-    df2 = df2[df2.typeID.isin(df3.type_id)]
-    df2.reset_index(drop=True, inplace=True)
-    df2.rename(columns={'typeName': 'type_name', 'typeID': 'type_id'}, inplace=True)
-    df2 = df2[['type_id', 'type_name']].reset_index(drop=True)
-    df4 = df3.merge(df2, on='type_id', how='left')
-    df4 = df4.reset_index(drop=True)
-
-    engine = create_engine(mkt_db)
-    with engine.connect() as conn:
-        df = pd.read_sql_table('Market_Stats', engine)
-        engine.dispose()
-
-    ids = df4['type_id'].unique().tolist()
-    df5 = df[df.type_id.isin(ids)]
-    df5.reset_index(drop=True, inplace=True)
-    #
-
-    df5 = df5[
-        ['type_id', 'total_volume_remain', 'price_5th_percentile', 'days_remaining', 'avg_daily_volume', 'group_name',
-         'category_name']]
-
-    rename_cols = {'total_volume_remain': 'volume', 'price_5th_percentile': 'price', 'days_remaining': 'days',
-                   'avg_daily_volume': 'avg_volume', 'group_name': 'group', 'category_name': 'category', }
-    df6 = df4.merge(df5, on='type_id', how='left')
-    df6.rename(columns=rename_cols, inplace=True)
-    df6[['volume', 'price']] = df6[['volume', 'price']].round(0).reset_index(drop=True)
-    df6['fits'] = (df6.volume / df6.quantity).round(0)
-    return df
+#Utility functions
+def convert_fit_date(date: str) -> datetime:
+    """enter date from WC Auth in format: dd Mon YYYY HH:MM:SS
+        Example: 15 Jan 2025 19:12:04
+    """
+
+    dt = datetime.strptime("15 Jan 2025 19:12:04", "%d %b %Y %H:%M:%S")
+    return dt
 
 def slot_yielder() -> Generator[str, None, None]:
     """
@@ -344,7 +88,21 @@ def slot_yielder() -> Generator[str, None, None]:
     while True:
         yield 'Cargo'
 
-def process_fit(fit_file: str, fit_id: int) -> List[List]:
+#EFT Fitting Parser
+
+def process_fit(fit_file: str, fit_id: int) -> List[FittingItem]:
+    """
+    pass in the path to an EFT formatted fitting file and a fit_id. Returns the fitting items as
+    in a list suitable for updating the database.
+
+    :param fit_file:
+    :param fit_id:
+    :return: List[FittingItem]
+
+    Usage: fit_items = process_fit("drake2501_39.txt", fit_id=39)
+
+    """
+
     fit = []
     qty = 1
     slot_gen = slot_yielder()
@@ -399,100 +157,107 @@ def process_fit(fit_file: str, fit_id: int) -> List[List]:
                 quantity=qty
             )
 
-            fit.append([
-                fitting_item.flag,
-                fitting_item.quantity,
-                fitting_item.type_id,
-                fitting_item.fit_id,
-                fitting_item.type_fk_id
-            ])
+            fit.append(fitting_item)
+        return fit
 
-    return fit
+#Database update functions
 
-
-
-def insert_fitting_items(fit_data: List[List], session: Session):
+def insert_fittings_fittingitems(fit_items: List[FittingItem], session: Session):
     stmt = insert(Fittings_FittingItem).values([
         {
-            "flag": row[0],
-            "quantity": row[1],
-            "type_id": row[2],
-            "fit_id": row[3],
-            "type_fk_id": row[4]
+            "flag": item.flag,
+            "quantity": item.quantity,
+            "type_id": item.type_id,
+            "fit_id": item.fit_id,
+            "type_fk_id": item.type_fk_id
         }
-        for row in fit_data
+        for item in fit_items
     ])
     session.execute(stmt)
     session.commit()
 
-def replace_fit_items(fit_file: str, fit_id: int, session: Session):
-    try:
-        # Step 1: Parse
-        fit_data = process_fit(fit_file, fit_id)
-        if not fit_data:
-            raise ValueError(f"No fitting items parsed from '{fit_file}'.")
+def update_fittings_fitting(
+    fit_items: List[FittingItem],
+    session: Session,
+    last_updated: Optional[datetime] = None
+):
 
-        # Step 2: Validate
-        items = []
-        for i, row in enumerate(fit_data):
-            flag, qty, type_id, fit_id_val, type_fk_id = row
+    """ Database update for the fittings_fitting table. Takes the output of process_fit,
+        a SQLAlchemy session, and datetime formatted update time. The convert_fit_date() function allows
+        last update time from WC Auth fittings.
 
-            if not flag or not isinstance(flag, str):
-                raise ValueError(f"Row {i}: Invalid flag: {flag}")
-            if not isinstance(qty, int) or qty <= 0:
-                raise ValueError(f"Row {i}: Invalid quantity: {qty}")
-            if not isinstance(type_id, int) or type_id <= 0:
-                raise ValueError(f"Row {i}: Invalid type_id: {type_id}")
-            if fit_id_val != fit_id:
-                raise ValueError(f"Row {i}: Mismatched fit_id: {fit_id_val}")
-            if type_fk_id != type_id:
-                raise ValueError(f"Row {i}: type_fk_id does not match type_id ({type_fk_id} != {type_id})")
+            converted_time = convert_fit_date('15 Jan 2025 19:12:04')
+            Usage:  update_fittings_fitting(fit_items=fit_items, session=session, last_updated=converted_time)
+        """
 
-            item = Fittings_FittingItem(
-                flag=flag,
-                quantity=qty,
-                type_id=type_id,
-                fit_id=fit_id,
-                type_fk_id=type_fk_id
-            )
-            items.append(item)
+    if not fit_items:
+        print("⚠️ No items provided. Skipping update.")
+        return
 
-        # Step 3: Show preview
-        print("\nProposed replacement data:")
-        for item in items:
-            print("  ", item)
+    # fit_id is the primary key of fittings_fitting
+    fit_id = fit_items[0].fit_id
+    fit_name = fit_items[0].fit_name
+    ship_name = fit_items[0].ship_type_name
 
-        confirm = input(f"\nReplace existing entries for fit_id={fit_id}? (y/n): ").strip().lower()
-        if confirm != "y":
-            print("Aborted by user. No changes made.")
-            return
+    # Derive the description text (human-readable inventory)
+    description = "\n".join(
+        f"{item.flag} x{item.quantity} {item.type_name}" for item in fit_items
+    )
 
-        # Step 4: Transaction
-        session.execute(delete(Fittings_FittingItem).where(Fittings_FittingItem.fit_id == fit_id))
-        session.add_all(items)
-        session.commit()
-        print(f"✅ Successfully replaced {len(items)} fitting items for fit_id={fit_id}.")
+    # Look up the ship's type_id from fittings_type
+    engine = create_engine(fittings_db, echo=False)
+    query = text("SELECT type_id FROM fittings_type WHERE type_name = :ship")
+    with engine.connect() as conn:
+        result = conn.execute(query, {"ship": ship_name}).fetchone()
+        ship_type_id = result[0] if result else None
 
-    except Exception as e:
-        session.rollback()
-        print(f"❌ Error occurred: {e}")
+    if ship_type_id is None:
+        raise ValueError(f"❌ Ship type '{ship_name}' not found in fittings_type.")
+
+    # Fetch existing fitting record from DB by ID (== fit_id)
+    existing = session.get(Fittings_Fitting, fit_id)
+    if not existing:
+        raise ValueError(f"❌ Fit with id={fit_id} does not exist in fittings_fitting.")
+
+    # Show proposed changes to the user
+    print("\n🔁 Proposed update to fittings_fitting:")
+    print(f"  ID:              {fit_id}")
+    print(f"  Name:            {existing.name} → {fit_name}")
+    print(f"  Description:     (will be regenerated from fitting items)")
+    print(f"  Ship Type ID:    {existing.ship_type_id} → {ship_type_id}")
+    print(f"  Last Updated:    {existing.last_updated} → {last_updated or 'NOW'}\n")
+
+    confirm = input("Apply these changes? (y/n): ").strip().lower()
+    if confirm != "y":
+        print("🚫 Aborted by user. No changes made.")
+        return
+
+    # Apply updates
+    existing.name = fit_name
+    existing.description = description
+    existing.ship_type_type_id = ship_type_id
+    existing.ship_type_id = ship_type_id
+    existing.last_updated = last_updated or datetime.now()
+
+    session.commit()
+    print(f"✅ Successfully updated fit ID {fit_id}.")
 
 if __name__ == '__main__':
-    pd.set_option('display.max_columns', None)
-    pd.set_option('display.max_rows', None)
 
+    #update with EFT formatted text file
     fit_file = "drake2501_39.txt"
 
-    # Create engine
+    # # Create engine
     engine = create_engine(fittings_db, echo=False)
-
     # Create configured session factory
+
+    #update with date from WC Auth fitting
+    last_updated = convert_fit_date("15 Jan 2025 19:12:04")
+
     SessionLocal = sessionmaker(bind=engine)
+    session = SessionLocal()
+    fit_items = process_fit(fit_file, fit_id=39)
+    for item in fit_items:
+        print(item)
 
-    with SessionLocal() as session:
-        replace_fit_items(fit_file, fit_id=39, session=session)
-
-
-
-
-
+    update_fittings_fitting(fit_items=fit_items, session=session, last_updated=last_updated)

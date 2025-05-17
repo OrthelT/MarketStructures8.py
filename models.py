@@ -7,7 +7,9 @@ from sqlalchemy import (
     Float,
     DateTime,
     Boolean,
-    PrimaryKeyConstraint, BigInteger)
+    PrimaryKeyConstraint,
+    BigInteger,
+    Text)
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 mkt_sqlfile = "sqlite:///market_orders.sqlite"
@@ -159,6 +161,22 @@ class Fittings_FittingItem(Base):
             f"type_id={self.type_id}, fit_id={self.fit_id}>"
         )
 
+class Fittings_Fitting(Base):
+    __tablename__ = "fittings_fitting"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    description: Mapped[str] = mapped_column(Text, nullable=False)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    ship_type_type_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    ship_type_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    created: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_updated: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    def __repr__(self):
+        return (
+            f"<Fittings_Fitting id={self.id} name='{self.name}' "
+            f"ship_type_id={self.ship_type_id}>"
+        )
 
 if __name__ == '__main__':
     pass
