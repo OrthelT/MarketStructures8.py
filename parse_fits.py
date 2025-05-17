@@ -5,12 +5,14 @@ from typing import Optional, Generator, List
 
 import pandas as pd
 from numpy import unique
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, text, insert
 from sqlalchemy.orm import sessionmaker, Session
 
 import logging_tool
 from data_mapping import map_data, remap_reversable
-from models import JoinedInvTypes, Fittings_FittingItem as fittings_fittingitem, Fittings_FittingItem
+from models import JoinedInvTypes, Fittings_FittingItem
+
+fittings_fittingitem = Fittings_FittingItem
 
 fitting_schema = [
     "type_id", "type_name", "group", "group_id", "category", "category_id",
@@ -46,7 +48,6 @@ class FittingItem:
     # Declare attributes that will be assigned in __post_init__
     type_id: int = field(init=False)
     type_fk_id: int = field(init=False)
-    details: dict = field(init=False)
 
     def __post_init__(self) -> None:
         self.type_id = self.get_type_id()
@@ -70,7 +71,6 @@ class FittingItem:
         query = text("SELECT * FROM fittings_fitting WHERE id = :fit_id")
         with engine.connect() as conn:
             row = conn.execute(query, {"fit_id": self.fit_id}).fetchone()
-            print(row)
             return dict(row._mapping) if row else {}
 
 
@@ -313,7 +313,6 @@ def parse_fit_number(fit_num: int) -> pd.DataFrame:
     with engine.connect() as conn:
         df = pd.read_sql_table('Market_Stats', engine)
         engine.dispose()
-    print(df.columns)
 
     ids = df4['type_id'].unique().tolist()
     df5 = df[df.type_id.isin(ids)]
@@ -340,47 +339,75 @@ def slot_yielder() -> Generator[str, None, None]:
     for slot in slots:
         yield slot
 
-def process_fit(text_file: str, fit_id: int):
-
+def process_fit(fit_file: str, fit_id: int) -> List[List]:
     fit = []
-    qty = None
-    with open(fit_file, 'r') as f:
-        for line in f:
+    qty = 1
+    slot_gen = slot_yielder()
+    current_slot = next(slot_gen)
+    ship_name = ""
+    fit_name = ""
 
-            if line == '':
-                slot = next(yield_slot())
-            if "," in line:
-                clean_name = line.strip().strip('[').strip(']')
-                ship_name = clean_name.split(',')[0]
-                fit_name = clean_name.split(',')[1].strip()
-                item = ship_name
-            elif line == '\n':
-                slot = next(yield_slot())
+    with open(fit_file, 'r', encoding='utf-8') as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                try:
+                    current_slot = next(slot_gen)
+                except StopIteration:
+                    current_slot = "Overflow"
                 continue
-            elif re.search(r'x[0-9]', line):
-                item_group = line.split(" x")
-                item = item_group[0].strip()
-                qty = item_group[1].strip()
-                qty = int(qty)
+
+            if line.startswith("[") and line.endswith("]"):
+                # Parse header
+                clean_name = line.strip('[]')
+                parts = clean_name.split(',')
+                ship_name = parts[0].strip()
+                fit_name = parts[1].strip() if len(parts) > 1 else "Unnamed Fit"
+                continue
+
+            # Parse line with quantity (e.g., "Nanite Repair Paste x50")
+            qty_match = re.search(r'\s+x(\d+)$', line)
+            if qty_match:
+                qty = int(qty_match.group(1))
+                item = line[:qty_match.start()].strip()
             else:
+                qty = 1
                 item = line.strip()
 
             fitting_item = FittingItem(
-                flag=slot,
+                flag=current_slot,
                 fit_id=fit_id,
                 type_name=item,
                 ship_type_name=ship_name,
                 fit_name=fit_name,
-                quantity= qty if not None else 1
+                quantity=qty
             )
+
             fit.append([
-                        fitting_item.flag,
-                        fitting_item.quantity,
-                        fitting_item.type_id,
-                        fitting_item.fit_id,
-                        fitting_item.type_fk_id
-                        ])
-        return fit
+                fitting_item.flag,
+                fitting_item.quantity,
+                fitting_item.type_id,
+                fitting_item.fit_id,
+                fitting_item.type_fk_id
+            ])
+
+    return fit
+
+
+def insert_fitting_items(fit_data: List[List], session: Session):
+    stmt = insert(Fittings_FittingItem).values([
+        {
+            "flag": row[0],
+            "quantity": row[1],
+            "type_id": row[2],
+            "fit_id": row[3],
+            "type_fk_id": row[4]
+        }
+        for row in fit_data
+    ])
+    session.execute(stmt)
+    session.commit()
+
 
 if __name__ == '__main__':
     pd.set_option('display.max_columns', None)
@@ -389,4 +416,7 @@ if __name__ == '__main__':
     fit_file = "drake2501_39.txt"
 
     fit = process_fit(fit_file, 39)
-    print(fit)
+
+
+
+
