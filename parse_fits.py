@@ -2,10 +2,12 @@ import re
 from re import search
 from dataclasses import dataclass, field
 from typing import Optional, Generator, List
+from collections import defaultdict
+
 
 import pandas as pd
 from numpy import unique
-from sqlalchemy import create_engine, text, insert
+from sqlalchemy import create_engine, text, insert, delete, select
 from sqlalchemy.orm import sessionmaker, Session
 
 import logging_tool
@@ -342,14 +344,11 @@ def slot_yielder() -> Generator[str, None, None]:
     while True:
         yield 'Cargo'
 
-
-from collections import defaultdict
-
 def process_fit(fit_file: str, fit_id: int) -> List[List]:
     fit = []
     qty = 1
     slot_gen = slot_yielder()
-    current_slot = next(slot_gen)
+    current_slot = None
     ship_name = ""
     fit_name = ""
     slot_counters = defaultdict(int)
@@ -357,9 +356,6 @@ def process_fit(fit_file: str, fit_id: int) -> List[List]:
     with open(fit_file, 'r', encoding='utf-8') as f:
         for line in f:
             line = line.strip()
-            if not line:
-                current_slot = next(slot_gen)
-                continue
 
             if line.startswith("[") and line.endswith("]"):
                 clean_name = line.strip('[]')
@@ -368,6 +364,16 @@ def process_fit(fit_file: str, fit_id: int) -> List[List]:
                 fit_name = parts[1].strip() if len(parts) > 1 else "Unnamed Fit"
                 continue
 
+            if line == "":
+                # Only advance to the next slot when a blank line *after* content is found
+                current_slot = next(slot_gen)
+                continue
+
+            if current_slot is None:
+                # First block: assign the first slot only when we encounter the first item
+                current_slot = next(slot_gen)
+
+            # Parse quantity
             qty_match = re.search(r'\s+x(\d+)$', line)
             if qty_match:
                 qty = int(qty_match.group(1))
@@ -376,13 +382,13 @@ def process_fit(fit_file: str, fit_id: int) -> List[List]:
                 qty = 1
                 item = line.strip()
 
-            # Determine slot name
+            # Construct slot name
             if current_slot in {'LoSlot', 'MedSlot', 'HiSlot', 'RigSlot'}:
-                slot_suffix = slot_counters[current_slot]
+                suffix = slot_counters[current_slot]
                 slot_counters[current_slot] += 1
-                slot_name = f"{current_slot}{slot_suffix}"
+                slot_name = f"{current_slot}{suffix}"
             else:
-                slot_name = current_slot  # 'Cargo' or 'DroneBay'
+                slot_name = current_slot  # 'DroneBay' or 'Cargo'
 
             fitting_item = FittingItem(
                 flag=slot_name,
@@ -402,6 +408,7 @@ def process_fit(fit_file: str, fit_id: int) -> List[List]:
             ])
 
     return fit
+
 
 
 def insert_fitting_items(fit_data: List[List], session: Session):
