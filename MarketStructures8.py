@@ -61,7 +61,7 @@ merged_sell_filename = (
 )
 master_history_filename = "data/masterhistory/valemarkethistory_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.csv"
 
-logger = configure_logging()
+logger = configure_logging(log_name=__name__)
 
 # ===============================================
 # Functions: Fetch Market Structure Orders
@@ -86,25 +86,38 @@ def fetch_market_orders():
     all_orders = []
     failed_pages = []
     failed_pages_count = 0
+    errors_detected = 0
 
-    logger.info("fetching orders...")  # Track status
+    logger.info("-----START FETCH MARKET ORDERS-----")
+    logger.info("-"*60)
 
     while page <= max_pages:
-        response = requests.get(MARKET_STRUCTURE_URL + str(page), headers=headers)
+        try:
+            response = requests.get(MARKET_STRUCTURE_URL + str(page), headers=headers, timeout=10)
+            if "X-Pages" in response.headers:
+                max_pages = int(response.headers["X-Pages"])
+                logger.info(f"Max pages: {max_pages}...")
+            elif response.status_code == 200:
+                max_pages = 1
 
-        if "X-Pages" in response.headers:
-            max_pages = int(response.headers["X-Pages"])
-        elif response.status_code == 200:
-            max_pages = 1
+            logger.info(f"Got page {page} of {max_pages}")
+            status_code = response.status_code
+            logger.info(f"status code {status_code}")
 
-        page_ratio: float = page / max_pages
-        page_ratio_rounded: int = round(page_ratio * 100)
-        page_ratio_rounded_str: str = str(page_ratio_rounded) + "%"
-        print(f"\rFetching market order pages pages {page_ratio_rounded_str}. Page: {page}", end="")
+            page_ratio: float = page / max_pages
+            page_ratio_rounded: int = round(page_ratio * 100)
+            page_ratio_rounded_str: str = str(page_ratio_rounded) + "%"
+            print(f"\rFetching market order pages pages {page_ratio_rounded_str}. Page: {page}", end="")
+            logger.info(f"fetching market orders page {page} of {max_pages} pages...")
+            # make sure we don't hit the error limit and get our IP banned
+            errorsleft = int(response.headers.get("X-ESI-Error-Limit-Remain", 0))
+            errorreset = int(response.headers.get("X-ESI-Error-Limit-Reset", 0))
 
-        # make sure we don't hit the error limit and get our IP banned
-        errorsleft = int(response.headers.get("X-ESI-Error-Limit-Remain", 0))
-        errorreset = int(response.headers.get("X-ESI-Error-Limit-Reset", 0))
+        except ReadTimeout as e:
+            logger.warning(f"Market API request timed out: {e}")
+            error_count += 1
+            errors_detected += 1
+            continue
 
         if errorsleft == 0:
             break
@@ -112,23 +125,30 @@ def fetch_market_orders():
             print(
                 f"WARNING: Errors remaining: {errorsleft}. Error limit reset: {errorreset} seconds."
             )
+            logger.error(f"Errors remaining: {errorsleft}. Error limit reset: {errorreset}")
 
         # some error handling to gently keep prodding the ESI until we gat all the data
         if response.status_code != 200:
+            errors_detected += 1
+            error_count += 1
+
             error_code = response.status_code
+            logger.error(f"Error detected: {errors_detected} status code: {error_code}")
+
             error_details = response.json()
             error = error_details["error"]
             logger.error(
-                f"Error fetching data from page {page}. status code: {error_code}"
+                f"Error fetching data from page {page}. status code: {error_code}, details: {error}"
             )
-            error_count += 1
 
             if tries < 5:
+                logger.error(f"error: {error_count}")
                 tries += 1
                 time.sleep(3)
                 continue
             else:
                 print(f"Reached the 5th try and giving up on page {page}.")
+                logger.error(f"Reached the 5th try and giving up on page {page}.")
                 failed_pages.append([page, error_code, error])
                 failed_pages_count += 1
                 page += 1
@@ -139,6 +159,7 @@ def fetch_market_orders():
             total_pages += 1
             try:
                 orders = response.json()
+                logger.info(f"Fetched {len(orders)} orders from page {page}.")
             except ValueError:
                 logger.error(f"Error decoding JSON response from page {page}.")
                 failed_pages.append([page, "ValueError", "ValueError"])
@@ -147,6 +168,7 @@ def fetch_market_orders():
         page += 1
 
         if not orders:
+            logger.error(f"No orders found in page {page}.")
             break
 
         all_orders.extend(orders)
@@ -156,12 +178,20 @@ def fetch_market_orders():
         logger.error(f'The following pages failed: {failed_pages}')
         print(f"{failed_pages_count} pages failed.")
         logger.error(print("{failed_pages_count} pages failed."))
+    elif errors_detected > 0:
+        print(f'All {total_pages} of {max_pages} pages fetched, but {errors_detected} errors detected.')
+        logger.warning(f"{total_pages} of {max_pages} pages fetched. but {errors_detected} errors detected.")
     else:
         print('\nAll pages fetched successfully.')
         logger.info(f'All pages fetched successfully.')
 
     logger.info(
-        f"done. successfully retrieved {len(all_orders)}...")
+        f"done. retrieved {len(all_orders)}...")
+    if error_count > 0:
+        logger.error(f"There were {error_count} errors.")
+
+    logger.info("-----END FETCH MARKET ORDERS-----")
+    logger.info("-"*60)
     return all_orders
 
 # update market history
@@ -443,6 +473,8 @@ def main() -> bool | None:
         return None
 
 if __name__ == "__main__":
+    logger.info("START OF MARKET UPDATE")
+    logger.info("="*80)
 
     # ===============================================
     # MAIN PROGRAM
@@ -527,3 +559,6 @@ if __name__ == "__main__":
     logger.info(f"Data for {len(final_data.index)} items retrieved.")
     logger.info(f"Total time: {total_time}")
     logger.info("market update complete")
+
+    logger.info("END OF MARKET UPDATE")
+    logger.info("="*80)

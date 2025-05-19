@@ -14,6 +14,7 @@ from shared_utils import read_doctrine_watchlist, get_doctrine_status_optimized
 
 sql_logger = logging_tool.configure_logging(log_name=__name__)
 brazil_logger = logging_tool.configure_logging(log_name="brazil")
+logger = sql_logger
 
 
 sql_file = "market_orders.sqlite"
@@ -313,9 +314,14 @@ def read_sql_watchlist() -> pd.DataFrame:
     if missing.empty:
         sql_logger.info("no missing items found, returning watchlist")
     else:
-        sql_logger.info("missing items found, merging doctrine_ids into watchlist")
+        sql_logger.info(f"{len(missing)} missing items found, merging doctrine_ids into watchlist")
         df = pd.concat([df, missing])
         df.reset_index(inplace=True, drop=True)
+
+        engine = create_engine(mkt_sqlfile, echo=False)
+        with engine.connect() as conn:
+            missing.to_sql('watchlist_mkt', conn, if_exists='replace', index=False)
+
     print(f'missing items = {len(missing)}, {missing.type_id.unique().tolist()}')
     return df
 

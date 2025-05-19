@@ -7,16 +7,11 @@ def configure_logging(
     log_file: str = "log_file/mkt_structures.log",
     max_bytes: int = 5 * 1024 * 1024,
     backup_count: int = 5,
-) -> logging.Logger:
+    ) -> logging.Logger:
     # create logger (or get existing)
     logger = logging.getLogger(log_name)
-    if logger.handlers:
-        # already configured
-        return logger
-    logger.setLevel(logging.INFO)
 
-    # ensure directory exists
-    os.makedirs(os.path.dirname(log_file), exist_ok=True)
+    logger.setLevel(logging.INFO)
 
     # common formatter
     fmt = "%(asctime)s - %(name)s - %(levelname)s %(funcName)s:%(lineno)d > %(message)s"

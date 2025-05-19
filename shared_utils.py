@@ -3,12 +3,14 @@
 import pandas as pd
 import sqlalchemy
 from matplotlib import pyplot as plt
-from sqlalchemy import create_engine, exc
+from sqlalchemy import create_engine, exc,text
 
 import logging_tool
 from doctrine_monitor import get_doctrine_fits, get_fit_items
 
 shared_logger = logging_tool.configure_logging(log_name=__name__)
+logger = shared_logger
+
 mkt_sqldb = "sqlite:///market_orders.sqlite"
 fit_mysqldb = "mysql+pymysql://Orthel:Dawson007!27608@localhost:3306/wc_fitting"
 mkt_sqlfile = mkt_sqldb
@@ -407,7 +409,7 @@ def get_doctrine_mkt_status() -> pd.DataFrame:
     doctrines.avg_vol = doctrines.avg_vol.round(0)
     doctrines.days = doctrines.days.round(0)
 
-    doctrines = handle_zero_dates(doctrines)
+    # doctrines = handle_zero_dates(doctrines)
 
     return doctrines
 
@@ -475,5 +477,3 @@ def handle_zero_dates(df: pd.DataFrame) -> pd.DataFrame:
 
 if __name__ == '__main__':
     pass
-
-

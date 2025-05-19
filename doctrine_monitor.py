@@ -165,10 +165,4 @@ def get_fit_name(fit_id: int)->str:
 
 
 if __name__ == "__main__":
-    engine = sqlalchemy.create_engine(fit_mysqlfile, echo=True)
-    query = f"SELECT * FROM fittings_fitting WHERE ship_type_id = 24698;"
-    with engine.connect() as conn:
-        results = conn.execute(text(query))
-        row = results.fetchone()
-        if row is not None:
-            print(row)
+    pass
