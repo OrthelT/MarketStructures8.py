@@ -1,4 +1,5 @@
 import argparse
+import json
 import logging
 import os
 import shutil
@@ -87,7 +88,6 @@ def fetch_market_orders():
     failed_pages = []
     failed_pages_count = 0
     errors_detected = 0
-
     logger.info("-----START FETCH MARKET ORDERS-----")
     logger.info("-"*60)
 
@@ -172,15 +172,17 @@ def fetch_market_orders():
             break
 
         all_orders.extend(orders)
-
+    error_dict = {}
     if failed_pages_count > 0:
         print(f"The following pages failed: {failed_pages}")
         logger.error(f'The following pages failed: {failed_pages}')
         print(f"{failed_pages_count} pages failed.")
+
         logger.error(print("{failed_pages_count} pages failed."))
     elif errors_detected > 0:
         print(f'All {total_pages} of {max_pages} pages fetched, but {errors_detected} errors detected.')
         logger.warning(f"{total_pages} of {max_pages} pages fetched. but {errors_detected} errors detected.")
+
     else:
         print('\nAll pages fetched successfully.')
         logger.info(f'All pages fetched successfully.')
@@ -189,6 +191,16 @@ def fetch_market_orders():
         f"done. retrieved {len(all_orders)}...")
     if error_count > 0:
         logger.error(f"There were {error_count} errors.")
+
+    #save the errors detected so we can evaluate the quality of data returned
+    error_dict['total_pages'] = total_pages
+    error_dict['failed_pages_count'] = failed_pages_count
+    error_dict['max_pages'] = max_pages
+    error_dict['errors_detected'] = errors_detected
+    error_dict['orders_retrieved'] = len(all_orders)
+    error_dict['timestamp'] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    with open('output/brazil/errors.json', 'w') as errors_file:
+        json.dump(error_dict, errors_file)
 
     logger.info("-----END FETCH MARKET ORDERS-----")
     logger.info("-"*60)

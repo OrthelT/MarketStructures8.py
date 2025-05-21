@@ -4,6 +4,7 @@ import pandas as pd
 import sqlalchemy
 from matplotlib import pyplot as plt
 from sqlalchemy import create_engine, exc,text
+import json
 
 import logging_tool
 from doctrine_monitor import get_doctrine_fits, get_fit_items
@@ -474,6 +475,49 @@ def handle_zero_dates(df: pd.DataFrame) -> pd.DataFrame:
     df.timestamp = df.timestamp.apply(lambda x: ts if x == str(0) else x)
     df.timestamp = pd.to_datetime(df.timestamp)
     return df
+
+def load_errors():
+    errors = "output/brazil/errors.json"
+    with open("output/brazil/errors.json", "r") as f:
+        error_data = json.load(f)
+
+    engine = create_engine(mkt_sqldb)
+    print("loading errors")
+
+    create_table_sql = text("""
+                            CREATE TABLE IF NOT EXISTS errors
+                            (
+                                total_pages        INTEGER,
+                                failed_pages_count INTEGER,
+                                max_pages          INTEGER,
+                                errors_detected    INTEGER,
+                                orders_retrieved   INTEGER,
+                                timestamp          TEXT
+                            )
+                            """)
+
+    insert_sql = text("""
+                      INSERT INTO errors (total_pages,
+                                          failed_pages_count,
+                                          max_pages,
+                                          errors_detected,
+                                          orders_retrieved,
+                                          timestamp)
+                      VALUES (:total_pages,
+                              :failed_pages_count,
+                              :max_pages,
+                              :errors_detected,
+                              :orders_retrieved,
+                              :timestamp)
+                      """)
+
+    with engine.begin() as conn:
+        # Create table if it doesn’t exist
+        conn.execute(create_table_sql)
+        # Insert one row, unpacking your dict into the named parameters
+        conn.execute(insert_sql, **error_data)
+        logger.info("errors inserted")
+        print("loading errors completed")
 
 if __name__ == '__main__':
     pass
