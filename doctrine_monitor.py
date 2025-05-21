@@ -2,9 +2,7 @@
 
 import pandas as pd
 import sqlalchemy
-import sqlalchemy.orm as orm
-from sqlalchemy import create_engine, select, text
-from sqlalchemy.dialects.mssql.information_schema import tables
+from sqlalchemy import create_engine, MetaData, update, text, Column, engine
 
 import logging_tool
 
@@ -164,8 +162,45 @@ def get_fit_name(fit_id: int)->str:
         else:
             return "not found"
 
+def update_bombers():
+
+    # Connect and reflect
+    engine = create_engine(fit_mysqlfile, echo=True)
+    metadata = MetaData()
+    metadata.reflect(bind=engine)
+
+    fittingitem = metadata.tables["fittings_fittingitem"]
+
+    updates = [
+        {"fit_id": 445, "flag": 'MedSlot0', "type_id": 35658},
+        {"fit_id": 445, "flag": 'MedSlot1', "type_id": 380},
+        {"fit_id": 445, "flag": 'MedSlot2', "type_id": 9580},
+        {"fit_id": 445, "flag": 'MedSlot3', "type_id": 380},
+        {"fit_id": 446, "flag": 'MedSlot0', "type_id": 35658},
+        {"fit_id": 446, "flag": 'MedSlot1', "type_id": 380},
+        {"fit_id": 446, "flag": 'MedSlot2', "type_id": 9580},
+        {"fit_id": 446, "flag": 'MedSlot3', "type_id": 380},
+        {"fit_id": 447, "flag": 'MedSlot0', "type_id": 380},
+        {"fit_id": 447, "flag": 'MedSlot1', "type_id": 380},
+        {"fit_id": 447, "flag": 'MedSlot2', "type_id": 5973},
+    ]
+
+    with engine.begin() as conn:  # auto commit/rollback
+        for row in updates:
+            stmt = (
+                update(fittingitem)
+                .where(
+                    (fittingitem.c.fit_id == row["fit_id"]) &
+                    (fittingitem.c.flag == row["flag"])
+                )
+                .values(type_id=row["type_id"])
+            )
+            conn.execute(stmt)
+
 
 if __name__ == "__main__":
     pass
+
+
 
 
