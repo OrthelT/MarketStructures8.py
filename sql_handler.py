@@ -318,10 +318,6 @@ def read_sql_watchlist() -> pd.DataFrame:
         df = pd.concat([df, missing])
         df.reset_index(inplace=True, drop=True)
 
-        engine = create_engine(mkt_sqlfile, echo=False)
-        with engine.connect() as conn:
-            missing.to_sql('watchlist_mkt', conn, if_exists='replace', index=False)
-
     print(f'missing items = {len(missing)}, {missing.type_id.unique().tolist()}')
     return df
 
@@ -330,7 +326,6 @@ def read_sql_market_stats() -> pd.DataFrame:
     with engine.connect() as conn:
         df = pd.read_sql_table('Market_Stats', conn)
     return df
-
 
 def read_sql_mkt_orders() -> pd.DataFrame:
     engine = create_engine(mkt_sqlfile, echo=False)
@@ -395,7 +390,6 @@ def add_fit_to_watchlist(fit) -> None:
         print("exiting without updating database")
         return None
 
-
 def market_data_to_brazil():
     print('starting market_data_to_brazil')
     print('=' * 100)
@@ -440,7 +434,6 @@ def market_data_to_brazil():
     brazil_logger.info('saved history data to csv and json')
 
     return None
-
 
 def plot_item_history(item_id: int, days: int = 60):
     df = get_item_history(item_id=item_id, doys=days)
