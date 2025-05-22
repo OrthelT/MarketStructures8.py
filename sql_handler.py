@@ -456,10 +456,8 @@ def plot_item_history(item_id: int, days: int = 60):
     )
     plt.show()
 
-
 def billions_formatter(x, _):
     return f'{x / 1e9:.1f}B'
-
 
 def plot_daily_total_ISK():
     df = read_history()
@@ -501,7 +499,6 @@ def plot_daily_total_ISK():
     ax.yaxis.set_major_formatter(FuncFormatter(billions_formatter))
     plt.show()
 
-
 def market_totals() -> pd.DataFrame:
     df = read_history(60)
     df['total_ISK'] = df['volume'] * df['average']
@@ -512,13 +509,11 @@ def market_totals() -> pd.DataFrame:
     thirty_day_total = df2['total_ISK'].sum()
     return df2
 
-
 def read_market_orders() -> pd.DataFrame:
     engine = create_engine(mkt_sqlfile, echo=False)
     with engine.connect() as conn:
         df = pd.read_sql_table('market_order', conn)
     return df
-
 
 def get_item_info(name) -> pd.DataFrame:
     engine = create_engine(mkt_sqlfile, echo=False)
