@@ -200,7 +200,3 @@ def update_bombers():
 
 if __name__ == "__main__":
     pass
-
-
-
-

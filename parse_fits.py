@@ -7,8 +7,9 @@ from datetime import datetime
 
 import pandas as pd
 from numpy import unique
-from sqlalchemy import create_engine, text, insert, delete, select
+from sqlalchemy import create_engine, text, insert, delete, select, MetaData, Table
 from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy.dialects.mysql import insert as mysql_insert
 
 import logging_tool
 from data_mapping import map_data, remap_reversable
@@ -55,8 +56,8 @@ class FittingItem:
                 self.fit_name = f"Default {self.ship_type_name} fit"
 
     def get_type_id(self) -> int:
-        engine = create_engine(fittings_db, echo=False)
-        query = text("SELECT type_id FROM fittings_type WHERE type_name = :type_name")
+        engine = create_engine(sde_db, echo=False)
+        query = text("SELECT typeID FROM invTypes WHERE typeName = :type_name")
         with engine.connect() as conn:
             result = conn.execute(query, {"type_name": self.type_name}).fetchone()
             return result[0] if result else -1  # return a sentinel or raise error
@@ -89,14 +90,13 @@ def slot_yielder() -> Generator[str, None, None]:
         yield 'Cargo'
 
 #EFT Fitting Parser
-
-def process_fit(fit_file: str, fit_id: int) -> List[FittingItem]:
+def process_fit(fit_file: str, fit_id: int):
     """
     pass in the path to an EFT formatted fitting file and a fit_id. Returns the fitting items as
     in a list suitable for updating the database.
 
-    :param fit_file:
-    :param fit_id:
+    :param fit_file: (EFT format)
+    :param fit_id: int
     :return: List[FittingItem]
 
     Usage: fit_items = process_fit("drake2501_39.txt", fit_id=39)
@@ -157,107 +157,265 @@ def process_fit(fit_file: str, fit_id: int) -> List[FittingItem]:
                 quantity=qty
             )
 
-            fit.append(fitting_item)
-        return fit
+            fit.append([fitting_item.flag, fitting_item.quantity,fitting_item.type_id,fit_id,fitting_item.type_id])
 
-#Database update functions
+    fitdf = pd.DataFrame(fit, columns=['flag', 'quantity', 'type_id', 'fit_id', 'type_fk_id'])
 
-def insert_fittings_fittingitems(fit_items: List[FittingItem], session: Session):
-    stmt = insert(Fittings_FittingItem).values([
-        {
-            "flag": item.flag,
-            "quantity": item.quantity,
-            "type_id": item.type_id,
-            "fit_id": item.fit_id,
-            "type_fk_id": item.type_fk_id
-        }
-        for item in fit_items
-    ])
-    session.execute(stmt)
-    session.commit()
+    pd.set_option('display.max_columns', None)
+    print(fitdf)
+    confirm = input("Fit look ok? (Y to continue)")
+    if confirm == "Y":
+        insert_fittings_fittingitems(fitdf)
+        print("fitting items inserted")
+    else:
+        print("fit not inserted, exiting")
 
-def update_fittings_fitting(
-    fit_items: List[FittingItem],
-    session: Session,
-    last_updated: Optional[datetime] = None
-):
+def insert_fittings_fittingitems(df: pd.DataFrame):
+    engine = create_engine(fittings_db, echo=False)
+    with engine.connect() as conn:
+        df.to_sql('fittings_fittingitem', conn, if_exists='append', index=False)
+        conn.commit()
 
-    """ Database update for the fittings_fitting table. Takes the output of process_fit,
-        a SQLAlchemy session, and datetime formatted update time. The convert_fit_date() function allows
-        last update time from WC Auth fittings.
+    print(f"Inserted {len(df)} fitting items")
+    print("please use additional functions to complete processing of new fit")
 
-            converted_time = convert_fit_date('15 Jan 2025 19:12:04')
-            Usage:  update_fittings_fitting(fit_items=fit_items, session=session, last_updated=converted_time)
+def update_fitting_type(type_id: int, radius: int, packaged_volume: int):
+    """
+    Populate fittings_type from invTypes (SDE), ensuring its parent
+    group and category exist in destination, manually setting radius
+    and packaged_volume.
+
+    :param type_id: the typeID to copy from invTypes
+    :param radius: manual radius value
+    :param packaged_volume: manual packaged_volume value
+    """
+    # Create engines
+    src_engine = create_engine(sde_db)
+    dst_engine = create_engine(fittings_db)
+
+    # Reflect source tables
+    src_meta = MetaData()
+    inv_types = Table("invTypes", src_meta, autoload_with=src_engine)
+    inv_groups = Table("invGroups", src_meta, autoload_with=src_engine)
+    inv_categories = Table("invCategories", src_meta, autoload_with=src_engine)
+
+    # Reflect destination tables
+    dst_meta = MetaData()
+    fittings_itemcategory = Table("fittings_itemcategory", dst_meta, autoload_with=dst_engine)
+    fittings_itemgroup    = Table("fittings_itemgroup",    dst_meta, autoload_with=dst_engine)
+    fittings_type_table   = Table("fittings_type",         dst_meta, autoload_with=dst_engine)
+
+    # Fetch source rows
+    with src_engine.connect() as src_conn:
+        type_row = src_conn.execute(
+            select(inv_types).where(inv_types.c.typeID == type_id)
+        ).first()
+        if not type_row:
+            raise ValueError(f"type_id {type_id} not found in invTypes")
+
+        grp_row = src_conn.execute(
+            select(inv_groups).where(inv_groups.c.groupID == type_row.groupID)
+        ).first()
+        if not grp_row:
+            raise ValueError(f"groupID {type_row.groupID} not found in invGroups")
+
+        cat_row = src_conn.execute(
+            select(inv_categories).where(inv_categories.c.categoryID == grp_row.categoryID)
+        ).first()
+        if not cat_row:
+            raise ValueError(f"categoryID {grp_row.categoryID} not found in invCategories")
+
+    # Prepare insert payloads
+    data_category = {
+        "category_id": cat_row.categoryID,
+        # adjust column name if needed (e.g., 'name' vs 'category_name')
+        "name":        cat_row.categoryName,
+        "published":   True,
+    }
+    data_group = {
+        "group_id":    grp_row.groupID,
+        "name":        grp_row.groupName,
+        "category_id": grp_row.categoryID,
+        "published":   True,
+    }
+    data_type = {
+        "type_id":         type_row.typeID,
+        "type_name":       type_row.typeName,
+        "published":       type_row.published,
+        "mass":            type_row.mass,
+        "capacity":        type_row.capacity,
+        "description":     type_row.description,
+        "volume":          type_row.volume,
+        "packaged_volume": packaged_volume,
+        "portion_size":    type_row.portionSize,
+        "radius":          radius,
+        "graphic_id":      type_row.graphicID,
+        "icon_id":         type_row.iconID,
+        "market_group_id": type_row.marketGroupID,
+        "group_id":        type_row.groupID,
+    }
+
+    # Perform upserts in proper order
+    with dst_engine.begin() as dst_conn:
+        # 1) Upsert category first
+        stmt_cat = mysql_insert(fittings_itemcategory).values(**data_category)
+        stmt_cat = stmt_cat.on_duplicate_key_update(
+            name=stmt_cat.inserted.name,
+            published=stmt_cat.inserted.published
+        )
+        dst_conn.execute(stmt_cat)
+
+        # 2) Upsert group next
+        stmt_grp = mysql_insert(fittings_itemgroup).values(**data_group)
+        stmt_grp = stmt_grp.on_duplicate_key_update(
+            name=stmt_grp.inserted.name,
+            category_id=stmt_grp.inserted.category_id,
+            published=stmt_grp.inserted.published
+        )
+        dst_conn.execute(stmt_grp)
+
+        # 3) Insert type
+        dst_conn.execute(insert(fittings_type_table).values(**data_type))
+
+    print(f"Upserted category {cat_row.categoryID}, group {grp_row.groupID}, "
+          f"and inserted type {type_id} (radius={radius}, packaged_volume={packaged_volume})")
+
+
+def add_new_fitting(fitting_dict: dict):
+    """
+    Inserts a new row into fittings_fitting using a parameter dict.
+    Expected keys in fitting_dict: id, description, name, ship_type_type_id,
+    ship_type_id, created, last_updated
+
+    example:
+
+    fittings_dict = {'id': 991, 'description': 'special anti-Kiki Kesteral',
+                    'name': 'Anti-Kiki Kesteral', 'ship_type_type_id': 43563,
+                    'ship_type_id': 43563, 'created': '2025-05-15 19:26:23.133593',
+                    'last_updated': '2025-05-15 19:26:23.133593'}
+
+    """
+    stmt = text(
         """
-
-    if not fit_items:
-        print("⚠️ No items provided. Skipping update.")
-        return
-
-    # fit_id is the primary key of fittings_fitting
-    fit_id = fit_items[0].fit_id
-    fit_name = fit_items[0].fit_name
-    ship_name = fit_items[0].ship_type_name
-
-    # Derive the description text (human-readable inventory)
-    description = "\n".join(
-        f"{item.flag} x{item.quantity} {item.type_name}" for item in fit_items
+        INSERT INTO fittings_fitting (
+            id,
+            description,
+            name,
+            ship_type_type_id,
+            ship_type_id,
+            created,
+            last_updated
+        )
+        VALUES (
+            :id,
+            :description,
+            :name,
+            :ship_type_type_id,
+            :ship_type_id,
+            :created,
+            :last_updated
+        )
+        """
     )
 
-    # Look up the ship's type_id from fittings_type
-    engine = create_engine(fittings_db, echo=False)
-    query = text("SELECT type_id FROM fittings_type WHERE type_name = :ship")
-    with engine.connect() as conn:
-        result = conn.execute(query, {"ship": ship_name}).fetchone()
-        ship_type_id = result[0] if result else None
+    engine = create_engine(fittings_db)
+    with engine.begin() as conn:
+        conn.execute(stmt, fitting_dict)
+    print(f"Added fitting with id={fitting_dict['id']} and name={fitting_dict['name']}")
 
-    if ship_type_id is None:
-        raise ValueError(f"❌ Ship type '{ship_name}' not found in fittings_type.")
+def update_fitting(fitting_id: int, description: str, name: str):
+    """
+    Update the description and name of a fitting record.
 
-    # Fetch existing fitting record from DB by ID (== fit_id)
-    existing = session.get(Fittings_Fitting, fit_id)
-    if not existing:
-        raise ValueError(f"❌ Fit with id={fit_id} does not exist in fittings_fitting.")
+    :param fitting_id:  primary key ID of the fitting to update
+    :param description: new description text
+    :param name:        new name text
 
-    # Show proposed changes to the user
-    print("\n🔁 Proposed update to fittings_fitting:")
-    print(f"  ID:              {fit_id}")
-    print(f"  Name:            {existing.name} → {fit_name}")
-    print(f"  Description:     (will be regenerated from fitting items)")
-    print(f"  Ship Type ID:    {existing.ship_type_id} → {ship_type_id}")
-    print(f"  Last Updated:    {existing.last_updated} → {last_updated or 'NOW'}\n")
+    usage:
+        update_fitting(
+        fitting_id=991,
+        description="special anti-Kiki Kestrel",
+        name="Anti-Kiki Kestrel"
+        )
+    """
+    engine = create_engine(fittings_db)
+    stmt = text(
+        """
+        UPDATE fittings_fitting
+        SET description = :description,
+            name        = :name
+        WHERE id       = :id
+        """
+    )
 
-    confirm = input("Apply these changes? (y/n): ").strip().lower()
-    if confirm != "y":
-        print("🚫 Aborted by user. No changes made.")
-        return
+    # Use a transaction context; commits on exit
+    with engine.begin() as conn:
+        conn.execute(stmt, {
+            "id": fitting_id,
+            "description": description,
+            "name": name
+        })
 
-    # Apply updates
-    existing.name = fit_name
-    existing.description = description
-    existing.ship_type_type_id = ship_type_id
-    existing.ship_type_id = ship_type_id
-    existing.last_updated = last_updated or datetime.now()
+    print(f"Updated fitting id={fitting_id} successfully")
 
-    session.commit()
-    print(f"✅ Successfully updated fit ID {fit_id}.")
+def change_fitting_id(id, new_fit_id):
+    """
+    :param id:
+    :param new_fit_id:
+
+    usage:
+        change_fitting_id(
+        id=5225,
+        new_fit_id=991
+        )
+    """
+    engine = create_engine(fittings_db)
+    stmt = text(
+        """
+        UPDATE fittings_doctrine_fittings
+        SET fitting_id = :new_fit_id
+        WHERE id = :id
+        """)
+
+    with engine.begin() as conn:
+        conn.execute(stmt, {
+            "new_fit_id": new_fit_id,
+            "id": id
+        })
+    print(f"Updated fitting fit_id={new_fit_id} successfully")
+
+def check_type_ids(type_ids: list[int])->list[int] | None:
+    missing_type_ids = []
+    print("checking type_ids")
+
+    for id in type_ids:
+        print("checking id:", id)
+        engine = create_engine(fittings_db, echo=False)
+        query = text("SELECT type_name FROM fittings_type WHERE type_id = :id")
+        try:
+            with engine.connect() as conn:
+                name = conn.execute(query, {"id": id})
+                if name.first() is None:
+                    print("missing type_id:", id)
+                    missing_type_ids.append(id)
+                else:
+                    print(f"type_id: {id} OK")
+
+        except:
+            print(f"Could not find type with id={id}")
+            missing_type_ids.append(id)
+            continue
+
+    if missing_type_ids:
+        ok = [id for id in type_ids if id not in missing_type_ids]
+        print("-"*60)
+        print("-"*60)
+        print("type_ids ok:", ok)
+        print("type_ids missing:", missing_type_ids)
+        return missing_type_ids
+    else:
+        print("no type_ids to add")
+        return None
 
 if __name__ == '__main__':
-
-    #update with EFT formatted text file
-    fit_file = "drake2501_39.txt"
-
-    # # Create engine
-    engine = create_engine(fittings_db, echo=False)
-    # Create configured session factory
-
-    #update with date from WC Auth fitting
-    last_updated = convert_fit_date("15 Jan 2025 19:12:04")
-
-    SessionLocal = sessionmaker(bind=engine)
-    session = SessionLocal()
-    fit_items = process_fit(fit_file, fit_id=39)
-    for item in fit_items:
-        print(item)
-
-    update_fittings_fitting(fit_items=fit_items, session=session, last_updated=last_updated)
+    pass
