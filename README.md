@@ -24,7 +24,8 @@ Instructions on how to install, configure, and use the project.
 1) Create a .env file to store your credentials:
 
 CLIENT_ID = '...'
-SECRET_KEY = '../'
+
+SECRET_KEY = '..'
 
 2) Configure variables in the main file for the structure you want and edit the type_ids .csv list to your liking.
 
