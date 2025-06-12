@@ -134,5 +134,4 @@ def gsheet_image_updater(df: pd.DataFrame):
 
 
 if __name__ == "__main__":
-    df = google_mkt_sheet_updater()
-    print(df['type_id'].unique())
+    pass

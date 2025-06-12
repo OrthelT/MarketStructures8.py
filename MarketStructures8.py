@@ -20,7 +20,6 @@ from logging_tool import configure_logging
 from shared_utils import fill_missing_stats_v2, get_doctrine_status_optimized, get_doctrine_mkt_status
 from sql_handler import process_esi_market_order_optimized, read_sql_watchlist, read_history, update_stats, \
     update_doctrine_stats, market_data_to_brazil, insert_pd_type_names
-
 # GNU General Public License
 #
 # ---------------------------------------------
@@ -76,7 +75,7 @@ def fetch_market_orders():
     headers = {
         "Authorization": f'Bearer {token["access_token"]}',
         "Content-Type": "application/json",
-        "User-Agent": "WC Markets v0.43 (admin contact: Orthel.Toralen@gmail.com; +https://github.com/OrthelT/ESIMarket_Tool",
+        "User-Agent": "WC Markets 0.52 (admin contact: Orthel.Toralen@gmail.com; +https://github.com/OrthelT/ESIMarket_Tool",
     }
 
     page = 1
@@ -227,7 +226,7 @@ def fetch_market_history(fresh_data: bool = True, id_list: list[Any] | None = No
 
         headers = {
             "Content-Type": "application/json",
-            "User-Agent": "WC Markets v0.43 (admin contact: Orthel.Toralen@gmail.com; +https://github.com/OrthelT/ESIMarket_Tool",
+            "User-Agent": "WC Markets 0.52 (admin contact: Orthel.Toralen@gmail.com; +https://github.com/OrthelT/ESIMarket_Tool",
         }
         all_history = []
         page = 1

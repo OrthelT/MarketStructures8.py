@@ -1,4 +1,5 @@
 import logging
+import os
 from datetime import datetime, timezone
 from typing import List
 
@@ -11,6 +12,7 @@ from sqlalchemy.orm import declarative_base
 import logging_tool
 from data_mapping import remap_reversable, reverse_remap
 from shared_utils import read_doctrine_watchlist, get_doctrine_status_optimized
+from doctrine_monitor import export_doctrine_fits
 
 sql_logger = logging_tool.configure_logging(log_name=__name__)
 brazil_logger = logging_tool.configure_logging(log_name="brazil")
@@ -427,6 +429,9 @@ def market_data_to_brazil():
     history_df = history_df.sort_values(by=['date'], ascending=False)
     history_df = history_df.reset_index(drop=True)
     history_df['average'] = history_df['average'].round(1)
+
+    export_doctrine_fits()
+    brazil_logger.info("exporting doctrine fits")
 
     brazil_logger.info(f'processed {len(history_df)} lines of history data')
     history_df.to_csv('output/brazil/new_history.csv')

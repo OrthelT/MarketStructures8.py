@@ -197,6 +197,17 @@ def update_bombers():
             )
             conn.execute(stmt)
 
+def export_doctrine_fits():
+    engine = sqlalchemy.create_engine(fit_mysqlfile, echo=True)
+    metadata = MetaData()
+    metadata.reflect(bind=engine)
+    query = f"SELECT * FROM doctrine_fits;"
+    with engine.connect() as conn:
+        fits = conn.execute(text(query))
+        cols = fits.keys()
+    df = pd.DataFrame.from_records(fits, columns=cols)
+    df.to_csv("output/brazil/doctrine_fits.csv", index=False)
+
 
 if __name__ == "__main__":
     pass

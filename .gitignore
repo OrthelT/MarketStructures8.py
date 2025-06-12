@@ -50,3 +50,5 @@ launcher_mktq.py
 drake2501_39.txt
 .idea/
 *.xml
+log_file/
+.idea/sqldialects.xml
