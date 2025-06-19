@@ -4,6 +4,9 @@ import logging_tool
 
 logger = logging_tool.configure_logging(log_name=__name__)
 
+updates_folder = r"\\wsl.localhost\Ubuntu\home\orthel\turso_update\data\latest"
+brazil = "output/brazil"
+
 def rename_move_and_archive_csv(src_folder, latest_folder, archive_folder, full_cleanup):
     # Find all files matching the pattern 'valemarketstats_*.csv' in the source folder
     logger.info('rearranging files')
@@ -43,3 +46,19 @@ def rename_move_and_archive_csv(src_folder, latest_folder, archive_folder, full_
             archive_file_dest = os.path.join(archive_folder, file)
             shutil.move(file_path, archive_file_dest)
             logger.info(f"File '{file}' has been moved to the '{archive_folder}' folder.")
+
+def push_updated_files():
+    """pushes updated files to the Turso update script directory,
+    removing the old ones"""
+
+    existing_files = os.listdir(updates_folder)
+    removed = 0
+    updated = 0
+    for file in existing_files:
+        os.remove(os.path.join(updates_folder, file))
+    for file in os.listdir(brazil):
+        shutil.copy(os.path.join(brazil, file), os.path.join(updates_folder, file))
+    logger.info(f"successfully removed {removed} files and added {updated} files")
+
+if __name__ == '__main__':
+    pass

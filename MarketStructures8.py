@@ -14,7 +14,7 @@ from requests import ReadTimeout
 
 import google_sheet_updater
 from ESI_OAUTH_FLOW import get_token
-from file_cleanup import rename_move_and_archive_csv
+from file_cleanup import rename_move_and_archive_csv, push_updated_files
 from get_jita_prices import get_jita_prices
 from logging_tool import configure_logging
 from shared_utils import fill_missing_stats_v2, get_doctrine_status_optimized, get_doctrine_mkt_status
@@ -553,7 +553,11 @@ if __name__ == "__main__":
     update_doctrine_status()
 
     shutil.copy('output/latest/doctrines_market_status.csv', 'output/brazil/new_doctrines.csv')
-    logger.info('Doctrines checked')
+
+    #push updated files to the turso script's directory to stage for db update
+    push_updated_files()
+
+
     # =========================================
     # Completed stats
     finish_time = datetime.now()
