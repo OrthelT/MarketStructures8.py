@@ -421,7 +421,7 @@ def process_orders(market_orders, history_data) -> tuple[DataFrame, DataFrame]:
     return vale_jita, final_data
 
 def save_data(history: DataFrame, vale_jita: DataFrame, final_data: DataFrame, fresh_data: bool = True):
-    update_time = datetime.now()
+    update_time = datetime.utcnow()
     if fresh_data:
         new_columns = [
             "date",
@@ -484,6 +484,8 @@ def main() -> bool | None:
         return None
 
 if __name__ == "__main__":
+
+
     logger.info("START OF MARKET UPDATE")
     logger.info("="*80)
 
