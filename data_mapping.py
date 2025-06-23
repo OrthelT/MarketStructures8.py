@@ -1,4 +1,4 @@
-import logging
+from logging_tool import configure_logging
 
 import pandas as pd
 
@@ -42,12 +42,7 @@ data_maps_schema = [
 ]
 
 # Configure logging
-logging.basicConfig(
-    filename="logs/unmapped_columns.log",
-    level=logging.INFO,
-    format="%(asctime)s - %(message)s"
-)
-
+logger = configure_logging(log_name=__name__)
 
 # Function to detect unmapped columns
 def detect_unmapped_columns(df: pd.DataFrame, mapping: dict) -> None:
@@ -58,7 +53,7 @@ def detect_unmapped_columns(df: pd.DataFrame, mapping: dict) -> None:
     unmapped_columns = set(df.columns) - mapped_columns
 
     if unmapped_columns:
-        logging.info("Unmapped columns detected: %s", list(unmapped_columns))
+        logger.info("Unmapped columns detected: %s", list(unmapped_columns))
         for col in list(unmapped_columns):
             field = input(
                 f"Unmapped column '{col}' detected. Map to which field in the schema? (Leave blank to ignore): ")
@@ -79,7 +74,7 @@ def preprocess_data(df: pd.DataFrame, mapping=None) -> pd.DataFrame:
     for standard_col, variations in mapping.items():
         for col in variations:
             if col in df.columns:
-                logging.info(f'renaming {col} to {standard_col}')
+                logger.info(f'renaming {col} to {standard_col}')
                 rename_map[col] = standard_col
                 reverse_map[standard_col] = col
                 print(f'renamed {col} to {standard_col}')
