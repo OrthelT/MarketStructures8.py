@@ -554,10 +554,6 @@ if __name__ == "__main__":
 
     shutil.copy('output/latest/doctrines_market_status.csv', 'output/brazil/new_doctrines.csv')
 
-    #push updated files to the turso script's directory to stage for db update
-    push_updated_files()
-
-
     # =========================================
     # Completed stats
     finish_time = datetime.now()
